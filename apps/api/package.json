@@ -15,6 +15,10 @@
     "@am/db": "workspace:*",
     "@fastify/cors": "^10.0.1",
     "fastify": "^5.2.0",
+    "nodemailer": "^6.9.16",
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17"
   }
 }

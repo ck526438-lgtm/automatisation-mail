@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = ["/connexion", "/inscription", "/invitation"];
+const PUBLIC = ["/connexion", "/inscription", "/invitation", "/mot-de-passe-oublie", "/reinitialisation"];
 
 /** Sans cookie de session, toute page de l'application renvoie vers la connexion. */
 export function middleware(req: NextRequest) {

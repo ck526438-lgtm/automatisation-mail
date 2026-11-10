@@ -2,7 +2,7 @@
  * Jetons d'accès OAuth : lecture, rafraîchissement automatique et gestion des révocations.
  */
 import { decryptSecret, encryptSecret, OAuthError, refreshAccessToken, type OAuthClient, type OAuthProvider } from "@am/core";
-import { eq, sendingAccounts, type Db } from "@am/db";
+import { eq, notifyAdmins, sendingAccounts, systemTemplates, type Db } from "@am/db";
 import { config } from "../config.js";
 
 type Account = typeof sendingAccounts.$inferSelect;
@@ -47,6 +47,8 @@ export async function accessTokenFor(db: Db, account: Account): Promise<string> 
       if (err instanceof OAuthError && err.needsReconnect) {
         await db.update(sendingAccounts).set({ needsReconnect: true, paused: true, syncError: "Accès révoqué : reconnectez la boîte" })
           .where(eq(sendingAccounts.id, account.id));
+        await notifyAdmins(db, account.orgId, "mailbox_reconnect",
+          systemTemplates.mailboxReconnect({ email: account.email, link: `${config.webUrl}/boites` }));
         throw new MailboxDisconnectedError(`Accès révoqué pour ${account.email} : reconnexion nécessaire`);
       }
       throw err;

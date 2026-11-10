@@ -39,8 +39,12 @@ export function registerOAuthStartRoute(app: FastifyInstance) {
 }
 
 export function registerOAuthCallbackRoute(app: FastifyInstance, { db }: AppDeps) {
+  // Application Windows : le consentement Google/Microsoft s'ouvre dans le navigateur du système
+  // (ils refusent les fenêtres intégrées), on y affiche donc une page de fin plutôt que l'interface.
   const back = (reply: FastifyReply, params: Record<string, string>) =>
-    reply.redirect(`${config.webUrl}/boites?${new URLSearchParams(params)}`, 302);
+    config.mode === "desktop"
+      ? reply.type("text/html").send(donePage(params))
+      : reply.redirect(`${config.webUrl}/boites?${new URLSearchParams(params)}`, 302);
 
   app.get<{ Params: { provider: string }; Querystring: { code?: string; state?: string; error?: string; error_description?: string } }>(
     "/oauth/:provider/callback",
@@ -92,4 +96,15 @@ export function registerOAuthCallbackRoute(app: FastifyInstance, { db }: AppDeps
       }
     },
   );
+}
+
+function donePage(p: Record<string, string>): string {
+  const esc = (v: string) => v.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+  const ok = Boolean(p.connecte);
+  const title = ok ? "Boîte connectée" : "Connexion non aboutie";
+  const body = ok ? `La boîte <b>${esc(p.connecte!)}</b> est connectée. Vous pouvez fermer cet onglet et revenir à Automatisation Mail.` : esc(p.erreur ?? "Erreur inconnue");
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${title}</title><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font-family:system-ui,sans-serif;background:#f6f8fb;color:#18233d;display:grid;place-items:center;min-height:100vh;margin:0}
+div{background:#fff;border:1px solid #e3e7ef;border-radius:14px;padding:28px;max-width:420px}h1{font-size:20px;color:${ok ? "#1f8a53" : "#c0392b"}}</style>
+</head><body><div><h1>${title}</h1><p>${body}</p></div></body></html>`;
 }

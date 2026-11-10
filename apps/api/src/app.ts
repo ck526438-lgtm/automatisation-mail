@@ -19,7 +19,7 @@ export interface AppDeps {
 
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // maxParamLength : les jetons signés de clic contiennent l'URL cible et dépassent les 100 caractères par défaut.
-  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" }, bodyLimit: 20 * 1024 * 1024, maxParamLength: 4096 });
+  const app = Fastify({ logger: { level: process.env.LOG_LEVEL ?? "info" }, bodyLimit: 20 * 1024 * 1024, routerOptions: { maxParamLength: 4096 } });
   await app.register(cors, { origin: config.corsOrigin.split(",") });
   app.decorateRequest("orgId", "");
   app.decorateRequest("userId", null);

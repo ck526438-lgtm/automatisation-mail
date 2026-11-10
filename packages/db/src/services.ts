@@ -6,6 +6,9 @@ import { and, eq, isNull, or, sql } from "drizzle-orm";
 import { classifyBounce, normalizeEmail, shouldPauseCampaign, type BounceInput } from "@am/core";
 import type { Db } from "./index.js";
 import * as s from "./schema.js";
+import { notifyAdmins, systemTemplates } from "./system-mail.js";
+
+const webUrl = () => process.env.WEB_URL ?? "http://localhost:3000";
 
 export type EventType = (typeof s.events.$inferInsert)["type"];
 
@@ -119,8 +122,13 @@ export async function checkCampaignHealth(db: Db, campaignId: string): Promise<v
   const st = await campaignStats(db, campaignId);
   const verdict = shouldPauseCampaign({ sent: st.sent, bounced: st.bounced, complaints: st.complaints });
   if (verdict.pause) {
-    await db.update(s.campaigns).set({ status: "paused", pauseReason: `Pause automatique : ${verdict.reason}` })
-      .where(and(eq(s.campaigns.id, campaignId), eq(s.campaigns.status, "running")));
+    const paused = await db.update(s.campaigns).set({ status: "paused", pauseReason: `Pause automatique : ${verdict.reason}` })
+      .where(and(eq(s.campaigns.id, campaignId), eq(s.campaigns.status, "running"))).returning();
+    const c = paused[0];
+    if (c) {
+      await notifyAdmins(db, c.orgId, "campaign_paused",
+        systemTemplates.campaignPaused({ campaign: c.name, reason: verdict.reason ?? "seuil dépassé", link: `${webUrl()}/campagnes/${c.id}` }));
+    }
   }
 }
 

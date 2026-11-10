@@ -33,3 +33,5 @@ export function hashApiKey(key: string): string {
 export function generateApiKey(): string {
   return `am_${randomBytes(24).toString("base64url")}`;
 }
+export * from "./system-mail.js";
+export * from "./desktop.js";

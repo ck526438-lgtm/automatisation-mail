@@ -4,6 +4,7 @@ export const config = {
   trackingSecret: process.env.TRACKING_SECRET ?? "change-me",
   /** URL publique de l'API, sert de domaine de tracking par défaut */
   publicUrl: process.env.API_PUBLIC_URL ?? "http://localhost:4000",
+  webUrl: process.env.WEB_URL ?? "http://localhost:3000",
   schedulerIntervalMs: Number(process.env.SCHEDULER_INTERVAL_MS ?? 15_000),
   schedulerBatch: Number(process.env.SCHEDULER_BATCH ?? 200),
   sendConcurrency: Number(process.env.SEND_CONCURRENCY ?? 5),

@@ -3,7 +3,6 @@
  * fait avancer chacune dans son graphe et met les envois en file.
  */
 import { randomUUID } from "node:crypto";
-import type { Queue } from "bullmq";
 import { advance, type WorkflowEvent, type Effect } from "@am/core";
 import {
   and, contacts, contactTags, eq, enrollments, inArray, messages, sendingAccounts,
@@ -15,6 +14,14 @@ type Enrollment = typeof enrollments.$inferSelect;
 
 export interface SendJob {
   messageId: string;
+}
+
+/**
+ * File d'envoi. En mode serveur : BullMQ sur Redis. En mode local (application Windows) :
+ * la table messages elle-même (statut « queued » + next_attempt_at), relue en boucle.
+ */
+export interface SendQueue {
+  enqueue(messageId: string): Promise<void>;
 }
 
 /** Réserve un lot d'inscriptions dues en repoussant leur échéance de 5 minutes (bail). */
@@ -40,7 +47,7 @@ async function pickAccount(db: Db, campaignId: string): Promise<string | null> {
   return rows[0]?.id ?? null;
 }
 
-async function applyEffect(db: Db, queue: Queue<SendJob>, e: Enrollment, effect: Effect, accountId: string | null): Promise<void> {
+async function applyEffect(db: Db, queue: SendQueue, e: Enrollment, effect: Effect, accountId: string | null): Promise<void> {
   switch (effect.kind) {
     case "send_email": {
       if (!accountId) throw new Error("Aucune boîte d'envoi disponible pour cette campagne");
@@ -58,7 +65,7 @@ async function applyEffect(db: Db, queue: Queue<SendJob>, e: Enrollment, effect:
         subject: "", status: "queued", idempotencyKey: `${e.id}:${effect.nodeId}`,
       }).onConflictDoNothing().returning({ id: messages.id });
       // Si la ligne existe déjà, l'e-mail a déjà été mis en file : pas de double envoi.
-      if (msg) await queue.add("send", { messageId: msg.id }, { jobId: msg.id, attempts: 4, backoff: { type: "exponential", delay: 60_000 }, removeOnComplete: 1000, removeOnFail: 5000 });
+      if (msg) await queue.enqueue(msg.id);
       break;
     }
     case "add_tag":
@@ -85,7 +92,7 @@ async function applyEffect(db: Db, queue: Queue<SendJob>, e: Enrollment, effect:
   }
 }
 
-export async function processEnrollment(db: Db, queue: Queue<SendJob>, e: Enrollment): Promise<void> {
+export async function processEnrollment(db: Db, queue: SendQueue, e: Enrollment): Promise<void> {
   const [version] = await db.select().from(workflowVersions).where(eq(workflowVersions.id, e.workflowVersionId));
   const [contact] = await db.select().from(contacts).where(eq(contacts.id, e.contactId));
   if (!version || !contact) {
@@ -127,7 +134,7 @@ export async function processEnrollment(db: Db, queue: Queue<SendJob>, e: Enroll
   }).where(eq(enrollments.id, e.id));
 }
 
-export function startScheduler(db: Db, queue: Queue<SendJob>, log: (msg: string, extra?: unknown) => void): () => void {
+export function startScheduler(db: Db, queue: SendQueue, log: (msg: string, extra?: unknown) => void): () => void {
   let running = false;
   const tick = async () => {
     if (running) return;

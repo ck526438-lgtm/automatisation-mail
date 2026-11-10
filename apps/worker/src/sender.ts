@@ -2,9 +2,8 @@
  * Worker d'envoi : contrôles de conformité et de délivrabilité, rendu, signature des liens, envoi SMTP.
  * Un envoi qui ne peut pas partir maintenant (fenêtre, quota, écart) est repoussé, jamais perdu.
  */
-import { DelayedError, type Job } from "bullmq";
 import {
-  allowedCampaignVolume, appendComplianceFooter, hashSeed, instrumentHtml, isInWindow, nextWindowStart, randomGapMs,
+  allowedCampaignVolume, appendComplianceFooter, appendReplyStopFooter, isLoopback, hashSeed, instrumentHtml, isInWindow, nextWindowStart, randomGapMs,
   render, textToHtml, unsubscribeHeaders, unsubscribeUrl, DEFAULT_WINDOW, type SendWindow,
 } from "@am/core";
 import {
@@ -14,23 +13,25 @@ import {
 import { config } from "./config.js";
 import { sendMessage, SendError } from "./mailbox/send.js";
 import { MailboxDisconnectedError } from "./mailbox/tokens.js";
-import type { SendJob } from "./scheduler.js";
 
-async function postpone(job: Job<SendJob>, token: string | undefined, until: Date, reason: string): Promise<never> {
-  await job.log(`Repoussé au ${until.toISOString()} : ${reason}`);
-  await job.moveToDelayed(until.getTime(), token);
-  throw new DelayedError();
-}
+/**
+ * Résultat d'un envoi. Une erreur levée = problème temporaire, à réessayer avec un délai croissant.
+ *   done  : terminé (envoyé, rebond immédiat, ou abandonné pour une raison définitive)
+ *   delay : pas maintenant (fenêtre horaire, quota, espacement, pause) — à reprendre à `until`
+ */
+export type SendOutcome = { status: "done"; note: string } | { status: "delay"; until: Date; reason: string };
+
+const done = (note: string): SendOutcome => ({ status: "done", note });
+const postpone = (until: Date, reason: string): SendOutcome => ({ status: "delay", until, reason });
 
 async function fail(db: Db, messageId: string, reason: string): Promise<void> {
   await db.update(messages).set({ status: "failed", error: reason }).where(eq(messages.id, messageId));
 }
 
-export function makeSendProcessor(db: Db) {
-  return async (job: Job<SendJob>, token?: string): Promise<string> => {
-    const [msg] = await db.select().from(messages).where(eq(messages.id, job.data.messageId));
-    if (!msg) return "message supprimé";
-    if (msg.status !== "queued") return `déjà ${msg.status}`;
+export async function processSend(db: Db, messageId: string): Promise<SendOutcome> {
+    const [msg] = await db.select().from(messages).where(eq(messages.id, messageId));
+    if (!msg) return done("message supprimé");
+    if (msg.status !== "queued") return done(`déjà ${msg.status}`);
 
     const [contact] = await db.select().from(contacts).where(eq(contacts.id, msg.contactId));
     const [campaign] = msg.campaignId ? await db.select().from(campaigns).where(eq(campaigns.id, msg.campaignId)) : [];
@@ -39,27 +40,27 @@ export function makeSendProcessor(db: Db) {
     const [enrollment] = msg.enrollmentId ? await db.select().from(enrollments).where(eq(enrollments.id, msg.enrollmentId)) : [];
     if (!contact || !account || !org) {
       await fail(db, msg.id, "contact, boîte ou organisation introuvable");
-      return "abandonné";
+      return done("abandonné");
     }
 
     // 1. Conformité : jamais d'envoi vers une adresse désinscrite, en rebond ou en plainte.
     if (contact.status !== "active" || (await isSuppressed(db, msg.orgId, contact.email))) {
       await fail(db, msg.id, "adresse supprimée");
-      return "supprimé";
+      return done("supprimé");
     }
     if (enrollment && enrollment.state === "stopped") {
       await fail(db, msg.id, `séquence arrêtée (${enrollment.stopReason ?? ""})`);
-      return "séquence arrêtée";
+      return done("séquence arrêtée");
     }
 
     // 2. Campagne en pause ou boîte suspendue : on attend.
-    if (campaign && campaign.status !== "running") return postpone(job, token, new Date(Date.now() + 3_600_000), `campagne ${campaign.status}`);
-    if (account.paused) return postpone(job, token, new Date(Date.now() + 3_600_000), "boîte en pause");
+    if (campaign && campaign.status !== "running") return postpone(new Date(Date.now() + 3_600_000), `campagne ${campaign.status}`);
+    if (account.paused) return postpone(new Date(Date.now() + 3_600_000), "boîte en pause");
 
     // 3. Fenêtre horaire dans le fuseau du contact.
     const window: SendWindow = { ...(campaign?.sendWindow ?? { ...DEFAULT_WINDOW, timezone: org.timezone }), ...(contact.timezone ? { timezone: contact.timezone } : {}) };
     const now = new Date();
-    if (!isInWindow(now, window)) return postpone(job, token, nextWindowStart(now, window), "hors fenêtre d'envoi");
+    if (!isInWindow(now, window)) return postpone(nextWindowStart(now, window), "hors fenêtre d'envoi");
 
     // 4. Quota journalier (warm-up + score de santé).
     const day = Math.floor((now.getTime() - account.warmupStartedAt.getTime()) / 86_400_000);
@@ -70,14 +71,14 @@ export function makeSendProcessor(db: Db) {
     if (Number(usage?.today ?? 0) >= allowed) {
       const tomorrow = new Date(now);
       tomorrow.setUTCHours(24, 0, 0, 0);
-      return postpone(job, token, nextWindowStart(tomorrow, window), `quota atteint (${allowed}/jour)`);
+      return postpone(nextWindowStart(tomorrow, window), `quota atteint (${allowed}/jour)`);
     }
 
     // 5. Écart aléatoire entre deux envois de la même boîte.
     if (usage?.last) {
       const gap = randomGapMs(config.minGapSeconds, config.maxGapSeconds);
       const readyAt = new Date(usage.last).getTime() + gap;
-      if (readyAt > now.getTime()) return postpone(job, token, new Date(readyAt), "espacement entre envois");
+      if (readyAt > now.getTime()) return postpone(new Date(readyAt), "espacement entre envois");
     }
 
     // 6. Rendu du contenu.
@@ -85,7 +86,7 @@ export function makeSendProcessor(db: Db) {
     const [tpl] = node ? await db.select().from(templates).where(eq(templates.id, node)) : [];
     if (!tpl) {
       await fail(db, msg.id, "template introuvable");
-      return "abandonné";
+      return done("abandonné");
     }
     const vars = {
       first_name: contact.firstName, last_name: contact.lastName, company: contact.company, title: contact.title,
@@ -99,15 +100,23 @@ export function makeSendProcessor(db: Db) {
 
     const [domainRow] = account.domainId ? await db.select().from(sendingDomains).where(eq(sendingDomains.id, account.domainId)) : [];
     const trackingBase = domainRow?.trackingDomain ? `https://${domainRow.trackingDomain}` : config.publicUrl;
+    // Application locale sans domaine public : les destinataires ne peuvent pas joindre ce poste.
+    // Pas de pixel ni de redirection de clic, et désinscription par réponse « STOP » ou par mailto.
+    const reachable = !isLoopback(trackingBase);
     html = instrumentHtml(html, {
       baseUrl: trackingBase, secret: config.trackingSecret, messageId: msg.id,
-      trackOpens: campaign?.trackOpens ?? false, trackClicks: campaign?.trackClicks ?? true,
+      trackOpens: reachable && (campaign?.trackOpens ?? false), trackClicks: reachable && (campaign?.trackClicks ?? true),
     });
-    const unsub = unsubscribeUrl(trackingBase, msg.id, config.trackingSecret);
-    const body = appendComplianceFooter({ html, text }, {
-      unsubscribeUrl: unsub, senderName: account.fromName || org.name, postalAddress: org.postalAddress,
-      style: campaign?.type === "cold" ? "prospection" : "newsletter",
-    });
+    const unsub = reachable ? unsubscribeUrl(trackingBase, msg.id, config.trackingSecret) : null;
+    const body = unsub
+      ? appendComplianceFooter({ html, text }, {
+          unsubscribeUrl: unsub, senderName: account.fromName || org.name, postalAddress: org.postalAddress,
+          style: campaign?.type === "cold" ? "prospection" : "newsletter",
+        })
+      : appendReplyStopFooter({ html, text }, { senderName: account.fromName || org.name, postalAddress: org.postalAddress });
+    const listHeaders = unsub
+      ? unsubscribeHeaders(unsub, account.email)
+      : { "List-Unsubscribe": `<mailto:${account.email}?subject=unsubscribe>` };
 
     // 7. Envoi (SMTP, Gmail API ou Microsoft Graph).
     try {
@@ -120,26 +129,25 @@ export function makeSendProcessor(db: Db) {
         messageId: `<${msg.messageIdHeader}>`,
         inReplyTo: msg.inReplyTo ? `<${msg.inReplyTo}>` : undefined,
         references: msg.inReplyTo ? [`<${msg.inReplyTo}>`] : undefined,
-        headers: { ...unsubscribeHeaders(unsub), "X-AM-Message": msg.id },
+        headers: { ...listHeaders, "X-AM-Message": msg.id },
       });
     } catch (err) {
       if (err instanceof SendError && err.permanent) {
         // Refus définitif du serveur destinataire : traité comme un rebond.
         await db.update(messages).set({ subject, sentAt: new Date(), status: "sent" }).where(eq(messages.id, msg.id));
         await handleBounce(db, { messageId: msg.id }, { code: err.responseCode && err.responseCode >= 500 ? err.responseCode : 550, message: err.message });
-        return "rejeté (rebond)";
+        return done("rejeté (rebond)");
       }
       if (err instanceof MailboxDisconnectedError) {
         // Boîte déconnectée : on réessaie dans une heure, le temps que l'utilisateur la reconnecte.
-        return postpone(job, token, new Date(Date.now() + 3_600_000), err.message);
+        return postpone(new Date(Date.now() + 3_600_000), err.message);
       }
-      throw err; // erreur temporaire : BullMQ réessaie avec backoff exponentiel
+      throw err; // erreur temporaire : la file réessaie avec un délai croissant
     }
 
     await db.update(messages).set({ subject, status: "sent", sentAt: new Date(), error: null }).where(eq(messages.id, msg.id));
     await recordEvent(db, { orgId: msg.orgId, type: "sent", messageId: msg.id, contactId: contact.id, campaignId: msg.campaignId, nodeId: msg.nodeId });
-    return "envoyé";
-  };
+    return done("envoyé");
 }
 
 async function nodeTemplate(db: Db, versionId: string, nodeId: string | null): Promise<string | null> {

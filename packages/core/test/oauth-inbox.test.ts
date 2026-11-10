@@ -74,9 +74,19 @@ describe("messages entrants", () => {
 
   it("classe une réponse humaine et une absence", () => {
     expect(classifyInbound(msg({ headers: { "in-reply-to": "<m1@acme.ci>" }, subject: "Re: Question rapide" })))
-      .toEqual({ kind: "reply", refs: ["m1@acme.ci"], autoReply: false });
+      .toEqual({ kind: "reply", refs: ["m1@acme.ci"], autoReply: false, unsubscribe: false });
     expect(classifyInbound(msg({ headers: { "In-Reply-To": "<m1@acme.ci>", "Auto-Submitted": "auto-replied" }, subject: "Absent du bureau" })))
       .toMatchObject({ kind: "reply", autoReply: true });
+  });
+
+  it("reconnaît les demandes de désinscription par e-mail", () => {
+    expect(classifyInbound(msg({ headers: { "in-reply-to": "<m1@acme.ci>" }, subject: "Re: Question rapide", text: "STOP\n\n> Bonjour…" })))
+      .toMatchObject({ kind: "reply", unsubscribe: true });
+    expect(classifyInbound(msg({ headers: { "in-reply-to": "<m1@acme.ci>" }, subject: "Re: Question", text: "Désinscrivez-moi svp" })))
+      .toMatchObject({ unsubscribe: true });
+    expect(classifyInbound(msg({ from: "Awa <Awa@Exemple.ci>", subject: "unsubscribe", text: "" }))).toEqual({ kind: "unsubscribe", from: "awa@exemple.ci" });
+    expect(classifyInbound(msg({ headers: { "in-reply-to": "<m1@acme.ci>" }, subject: "Re: Question", text: "Oui, mais pas avant le stop de la saison" })))
+      .toMatchObject({ unsubscribe: false });
   });
 
   it("ignore les messages sans lien et ceux de la boîte elle-même", () => {

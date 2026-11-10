@@ -8,6 +8,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./dist/index.js"
+    },
+    "./local": {
+      "types": "./src/local.ts",
+      "default": "./dist/local.js"
     }
   },
   "scripts": {
@@ -16,10 +20,12 @@
     "test": "echo \"(pas de test unitaire pour @am/db)\"",
     "push": "drizzle-kit push",
     "generate": "drizzle-kit generate",
-    "seed": "tsx --env-file-if-exists=../../.env src/seed.ts"
+    "seed": "tsx --env-file-if-exists=../../.env src/seed.ts",
+    "migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts"
   },
   "dependencies": {
     "@am/core": "workspace:*",
+    "@electric-sql/pglite": "^0.2",
     "drizzle-orm": "^0.38.3",
     "pg": "^8.13.1"
   },

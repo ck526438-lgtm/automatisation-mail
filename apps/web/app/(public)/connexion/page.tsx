@@ -23,12 +23,13 @@ async function login(formData: FormData) {
   redirect(next);
 }
 
-export default async function Login({ searchParams }: { searchParams: Promise<{ erreur?: string; suite?: string; expire?: string }> }) {
+export default async function Login({ searchParams }: { searchParams: Promise<{ erreur?: string; suite?: string; expire?: string; reinitialise?: string }> }) {
   const sp = await searchParams;
   return (
     <>
       <h1>Connexion</h1>
       {sp.expire && <div className="notice">Votre session a expiré. Reconnectez-vous.</div>}
+      {sp.reinitialise && <div className="notice">Mot de passe changé. Connectez-vous avec le nouveau.</div>}
       {sp.erreur && <div className="notice error">{sp.erreur}</div>}
       <form action={login} className="stack">
         <input type="hidden" name="suite" value={safeNext(sp.suite)} />
@@ -36,6 +37,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         <label>Mot de passe<input name="password" type="password" autoComplete="current-password" required /></label>
         <button className="btn">Se connecter</button>
       </form>
+      <p className="muted"><a href="/mot-de-passe-oublie">Mot de passe oublié ?</a></p>
       <p className="muted">Pas encore de compte ? <a href="/inscription">Créer une organisation</a></p>
     </>
   );

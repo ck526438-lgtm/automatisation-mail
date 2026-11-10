@@ -231,12 +231,16 @@ export const messages = pgTable("messages", {
   error: text("error"),
   /** Clé d'idempotence : enrollment + nœud, empêche le double envoi */
   idempotencyKey: text("idempotency_key").notNull(),
+  /** File locale (mode application) : prochaine tentative et nombre d'essais */
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow(),
+  attempts: integer("attempts").notNull().default(0),
   sentAt: timestamp("sent_at", { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => [
   uniqueIndex("messages_message_id_idx").on(t.messageIdHeader),
   uniqueIndex("messages_idempotency_idx").on(t.idempotencyKey),
   index("messages_account_sent_idx").on(t.sendingAccountId, t.sentAt),
+  index("messages_queue_idx").on(t.status, t.nextAttemptAt),
 ]);
 
 /** Journal d'événements (à partitionner par mois en production, puis migrer vers ClickHouse). */
@@ -275,4 +279,38 @@ export const auditLogs = pgTable("audit_logs", {
   target: text("target"),
   meta: jsonb("meta").$type<Record<string, unknown>>().notNull().default({}),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Réinitialisation du mot de passe : lien à usage unique, valable 1 heure. */
+export const passwordResets = pgTable("password_resets", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("password_resets_token_idx").on(t.tokenHash)]);
+
+/** File des e-mails système (invitations, mot de passe, alertes), envoyés par le SMTP dédié. */
+export const systemEmails = pgTable("system_emails", {
+  id: id(),
+  orgId: uuid("org_id").references(() => organizations.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  to: text("to").notNull(),
+  subject: text("subject").notNull(),
+  text: text("text").notNull(),
+  html: text("html").notNull(),
+  status: text("status", { enum: ["pending", "sent", "failed"] }).notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  error: text("error"),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [index("system_emails_queue_idx").on(t.status, t.nextAttemptAt)]);
+
+/** Réglages de la plateforme (une ligne par clé), ex. le SMTP des e-mails système. */
+export const platformSettings = pgTable("platform_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").$type<Record<string, unknown>>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

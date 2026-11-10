@@ -46,6 +46,6 @@ describe("lecture des messages reçus", () => {
 
   it("reconnaît une réponse par ses en-têtes", async () => {
     const raw = "From: Client <c@exemple.ci>\r\nSubject: Re: Bonjour\r\nIn-Reply-To: <orig@acme.ci>\r\n\r\nOui, volontiers.\r\n";
-    expect(classifyInbound(toInbound(await simpleParser(Buffer.from(raw))))).toEqual({ kind: "reply", refs: ["orig@acme.ci"], autoReply: false });
+    expect(classifyInbound(toInbound(await simpleParser(Buffer.from(raw))))).toEqual({ kind: "reply", refs: ["orig@acme.ci"], autoReply: false, unsubscribe: false });
   });
 });

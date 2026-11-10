@@ -13,7 +13,8 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:push": "pnpm --filter @am/db push",
-    "db:seed": "pnpm --filter @am/db seed"
+    "db:seed": "pnpm --filter @am/db seed",
+    "db:migrate": "pnpm --filter @am/db migrate"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

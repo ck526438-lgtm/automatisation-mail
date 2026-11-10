@@ -6,7 +6,8 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser, type ParsedMail } from "mailparser";
 import { classifyInbound, decryptSecret, type InboundMessage } from "@am/core";
-import { desc, eq, handleBounce, handleReply, inboundAlreadyProcessed, sendingAccounts, sql, type Db } from "@am/db";
+import { and, contacts, desc, eq, handleBounce, handleReply, inboundAlreadyProcessed, recordEvent, sendingAccounts, sql, type Db } from "@am/db";
+import { normalizeEmail } from "@am/core";
 import { config } from "../config.js";
 import { GMAIL_API, GRAPH_API } from "./send.js";
 import { accessTokenFor, MailboxDisconnectedError } from "./tokens.js";
@@ -121,11 +122,12 @@ export interface SyncResult {
   replies: number;
   autoReplies: number;
   bounces: number;
+  unsubscribes: number;
   ignored: number;
 }
 
 export async function processInbound(db: Db, account: Account, items: RawInbound[]): Promise<SyncResult> {
-  const r: SyncResult = { scanned: items.length, replies: 0, autoReplies: 0, bounces: 0, ignored: 0 };
+  const r: SyncResult = { scanned: items.length, replies: 0, autoReplies: 0, bounces: 0, unsubscribes: 0, ignored: 0 };
   for (const item of items) {
     if (await inboundAlreadyProcessed(db, account.id, item.id)) {
       r.ignored++;
@@ -143,6 +145,17 @@ export async function processInbound(db: Db, account: Account, items: RawInbound
       if (!matched) r.ignored++;
       else if (verdict.autoReply) r.autoReplies++;
       else r.replies++;
+      if (matched && verdict.unsubscribe) {
+        await recordEvent(db, { orgId: matched.orgId, type: "unsubscribe", messageId: matched.id, contactId: matched.contactId, campaignId: matched.campaignId, nodeId: matched.nodeId, meta: { ...meta, via: "réponse" } });
+        r.unsubscribes++;
+      }
+    } else if (verdict.kind === "unsubscribe") {
+      const [c] = await db.select({ id: contacts.id }).from(contacts)
+        .where(and(eq(contacts.orgId, account.orgId), eq(contacts.emailNormalized, normalizeEmail(verdict.from))));
+      if (c) {
+        await recordEvent(db, { orgId: account.orgId, type: "unsubscribe", contactId: c.id, meta: { ...meta, via: "mailto" } });
+        r.unsubscribes++;
+      } else r.ignored++;
     } else if (verdict.kind === "bounce") {
       let ref: { messageIdHeader?: string; messageId?: string } | null = verdict.originalMessageId ? { messageIdHeader: verdict.originalMessageId } : null;
       // Sans Message-ID d'origine : dernier message envoyé par cette boîte au destinataire en échec.

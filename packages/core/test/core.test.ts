@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  advance, allowedCampaignVolume, applyMapping, checkDomain, checkEmail, classifyBounce, contentSpamCheck,
+  advance, allowedCampaignVolume, appendReplyStopFooter, applyMapping, isLoopback, checkDomain, checkEmail, classifyBounce, contentSpamCheck,
   decryptSecret, dedupeContacts, encryptSecret, extractVariables, healthScore, instrumentHtml, isInWindow,
   matchesSegment, nextWindowStart, normalizeEmail, parseCsv, render, segmentToSql, shouldPauseCampaign,
   signToken, startNodeId, suggestMapping, threeStepColdSequence, unsubscribeHeaders, validateWorkflow,
@@ -244,6 +244,15 @@ describe("tracking et conformité", () => {
       "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
     });
   });
+  it("repère une adresse inaccessible aux destinataires et propose la désinscription par réponse", () => {
+    expect(isLoopback("http://127.0.0.1:47811")).toBe(true);
+    expect(isLoopback("http://localhost:4000")).toBe(true);
+    expect(isLoopback("https://t.acme.ci")).toBe(false);
+    const b = appendReplyStopFooter({ html: "<p>Bonjour</p>", text: "Bonjour" }, { senderName: "Awa", postalAddress: "Cocody, Abidjan" });
+    expect(b.text).toContain("répondez simplement « STOP »");
+    expect(b.text).toContain("Awa · Cocody, Abidjan");
+  });
+
   it("chiffre et déchiffre les secrets", () => {
     const key = "11".repeat(32);
     const enc = encryptSecret("mot-de-passe-smtp", key);

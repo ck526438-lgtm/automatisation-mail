@@ -14,7 +14,8 @@ export interface InboundMessage {
 }
 
 export type InboundVerdict =
-  | { kind: "reply"; refs: string[]; autoReply: boolean }
+  | { kind: "reply"; refs: string[]; autoReply: boolean; unsubscribe: boolean }
+  | { kind: "unsubscribe"; from: string }
   | { kind: "bounce"; originalMessageId: string | null; recipient: string | null; bounce: BounceInput }
   | { kind: "ignore"; reason: string };
 
@@ -68,6 +69,19 @@ export function parseDsn(m: InboundMessage): { originalMessageId: string | null;
   return { originalMessageId: original, recipient: recipient?.toLowerCase() ?? null, bounce: { code, enhanced, message: message || m.subject } };
 }
 
+const UNSUB_SUBJECT = /^\s*(re\s*:\s*)*(unsubscribe|d[ée]sinscri(ption|re|vez)|stop|ne plus recevoir)\b/i;
+const UNSUB_BODY = /^\s*(stop|unsubscribe|d[ée]sinscri(ption|vez[- ]moi|re)|retirez[- ]moi|ne plus (me )?(contacter|recevoir))\b/i;
+
+/**
+ * Demande de désinscription par e-mail : objet « unsubscribe » (en-tête List-Unsubscribe mailto)
+ * ou réponse qui commence par « STOP », « désinscription »…
+ */
+export function isUnsubscribeRequest(m: InboundMessage): boolean {
+  if (UNSUB_SUBJECT.test(m.subject)) return true;
+  const firstLine = m.text.split(/\r?\n/).map((l) => l.trim()).find((l) => l && !l.startsWith(">")) ?? "";
+  return UNSUB_BODY.test(firstLine);
+}
+
 /** Classe un message entrant pour le moteur : réponse (humaine ou automatique), rebond ou à ignorer. */
 export function classifyInbound(m: InboundMessage, ownAddress?: string): InboundVerdict {
   if (ownAddress && m.from.toLowerCase().includes(ownAddress.toLowerCase())) return { kind: "ignore", reason: "message envoyé par la boîte elle-même" };
@@ -76,6 +90,12 @@ export function classifyInbound(m: InboundMessage, ownAddress?: string): Inbound
     return { kind: "bounce", ...dsn };
   }
   const refs = extractRefs(m);
-  if (refs.length === 0) return { kind: "ignore", reason: "aucune référence à un message envoyé" };
-  return { kind: "reply", refs, autoReply: isAutoReplyMessage(m) };
+  const unsubscribe = isUnsubscribeRequest(m);
+  if (refs.length === 0) {
+    // Le lien mailto de List-Unsubscribe produit un message sans référence : on se fie à l'expéditeur.
+    if (unsubscribe) return { kind: "unsubscribe", from: m.from.match(/<([^>]+)>/)?.[1]?.toLowerCase() ?? m.from.trim().toLowerCase() };
+    return { kind: "ignore", reason: "aucune référence à un message envoyé" };
+  }
+  const autoReply = isAutoReplyMessage(m);
+  return { kind: "reply", refs, autoReply, unsubscribe: unsubscribe && !autoReply };
 }

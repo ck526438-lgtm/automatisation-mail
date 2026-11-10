@@ -6,5 +6,5 @@
     "types": ["node"]
   },
   "include": ["src"],
-  "exclude": ["src/seed.ts"]
+  "exclude": ["src/seed.ts", "src/migrate.ts"]
 }

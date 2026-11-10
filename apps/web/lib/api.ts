@@ -81,9 +81,23 @@ export async function tryApi<T>(path: string): Promise<{ data: T | null; error: 
 export type Role = "owner" | "admin" | "member";
 
 export interface Me {
-  user: { id: string; email: string; name: string | null; role: Role } | null;
+  user: { id: string; email: string; name: string | null; role: Role; hasPassword: boolean } | null;
   role: Role;
   org: { id: string; name: string; postalAddress: string; timezone: string };
+  mode: "desktop" | "server";
+  canManagePlatform: boolean;
+}
+
+export interface SystemSmtpSettings {
+  configured: boolean;
+  source: "env" | "settings" | null;
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string;
+  from: string;
+  hasPassword: boolean;
+  queue: { pending: number; failed: number };
 }
 
 export interface Member {

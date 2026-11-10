@@ -12,9 +12,13 @@
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.9-1f5fbf">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-1f5fbf">
   <img alt="Statut" src="https://img.shields.io/badge/statut-MVP-f2771f">
+  <img alt="Windows" src="https://github.com/ck526438-lgtm/automatisation-mail/actions/workflows/windows.yml/badge.svg">
 </p>
 
 ---
+
+> **Application Windows** : un installateur `.exe` autonome, sans serveur. Base de données, moteur d'envoi, lecture des boîtes
+> et interface tournent sur le PC. Voir [docs/windows.md](docs/windows.md).
 
 ## Ce que fait le MVP aujourd'hui
 
@@ -28,6 +32,7 @@
 | **Rebonds & réponses** | Lecture automatique des boîtes toutes les 2 minutes (Gmail, Microsoft Graph, IMAP) : réponses rattachées par `In-Reply-To` / `References`, rapports de non-remise (RFC 3464, Gmail, Exchange) analysés, déduplication entre passages. Classification hard / soft / bloc, webhooks génériques et Amazon SES en complément, réponses automatiques (RFC 3834) qui ne stoppent pas la séquence |
 | **Tracking** | Pixel d'ouverture (désactivé par défaut en prospection), redirection des clics avec jetons signés HMAC, filtrage des ouvertures et clics de robots (proxys d'images, scanners de sécurité), statistiques par campagne et par étape |
 | **Conformité** | Lien de désinscription et adresse postale injectés dans chaque e-mail, en-têtes `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058, exigés par Gmail et Yahoo), liste de suppression par organisation et globale, journal du consentement, export et effacement d'un contact (droits RGPD) |
+| **E-mails système** | Envoi automatique par un SMTP dédié, séparé des boîtes de prospection : invitation d'équipe, mot de passe oublié (lien valable 1 h, à usage unique), avis de changement de mot de passe, alertes aux administrateurs (campagne mise en pause, boîte à reconnecter). File d'envoi avec nouvelles tentatives ; réglable dans l'interface ou par variables d'environnement |
 | **Comptes & équipe** | Inscription (création d'organisation), connexion par e-mail et mot de passe (scrypt), sessions en cookie httpOnly, blocage après 5 essais, invitations à usage unique valables 7 jours, rôles propriétaire / administrateur / membre, journal d'activité, clé API régénérable pour les intégrations |
 | **Interface** | Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (connexion, santé, warm-up, quotas), vérificateur DNS, équipe et réglages |
 
@@ -36,8 +41,10 @@
 ```
 apps/
   api/       Fastify — API REST /v1, tracking public, désinscription, webhooks entrants
-  worker/    BullMQ — scheduler des séquences, envoi SMTP, maintenance (santé, DNS)
+  worker/    Moteur : scheduler des séquences, envois, lecture des boîtes, e-mails système
+             (BullMQ + Redis en mode serveur, file en base en mode application)
   web/       Next.js 15 — interface d'administration
+  desktop/   Electron — application Windows autonome (PGlite, API, moteur et interface embarqués)
 packages/
   core/      Logique métier pure et testée (workflow, rebonds, DNS, templates, segments, warm-up, tracking)
   db/        Schéma PostgreSQL (Drizzle ORM), services partagés, données de démonstration
@@ -58,7 +65,7 @@ cp .env.example .env
 pnpm install
 
 docker compose up -d          # PostgreSQL, Redis, Mailpit
-pnpm db:push                  # crée les tables
+pnpm db:migrate               # crée les tables (migrations SQL versionnées)
 pnpm db:seed                  # organisation de démo, boîte SMTP vers Mailpit, séquence en 3 étapes, 3 contacts
 pnpm dev                      # API :4000, worker, interface :3000
 ```
@@ -143,15 +150,18 @@ curl -X POST localhost:4000/v1/campaigns/<id>/start -H "x-api-key: dev-key-chang
 ## Tests
 
 ```bash
-pnpm test        # 57 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, mots de passe, rôles, API
+pnpm test        # 62 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, mots de passe, rôles, API
 pnpm typecheck
 pnpm build
+pnpm --filter @am/desktop stage && pnpm --filter @am/desktop smoke   # application Windows de bout en bout
 ```
 
 ## Mise en production
 
 - Créez les applications OAuth Google et Microsoft et renseignez leurs identifiants : [docs/oauth.md](docs/oauth.md).
 - Mettez `ALLOW_SIGNUP=false` si seules vos invitations doivent permettre de créer un compte. Avec plusieurs instances d'API, remplacez la limitation des tentatives de connexion (en mémoire) par un compteur Redis.
+- E-mails système : `SYSTEM_SMTP_HOST`, `SYSTEM_SMTP_PORT`, `SYSTEM_SMTP_SECURE`, `SYSTEM_SMTP_USER`, `SYSTEM_SMTP_PASS`, `SYSTEM_SMTP_FROM`. Sans ces variables, les adresses listées dans `PLATFORM_ADMINS` peuvent le régler dans l'interface.
+- Base : `pnpm db:migrate` à chaque mise à jour. Après une modification du schéma, `pnpm --filter @am/db generate` crée la migration.
 - Générez des secrets : `ENCRYPTION_KEY` (`openssl rand -hex 32`), `TRACKING_SECRET`, `WEBHOOK_SECRET`. L'API refuse de démarrer en production avec les valeurs par défaut.
 - Images Docker : `docker build --target api .` et `docker build --target worker .`. Le worker se met à l'échelle indépendamment de l'API.
 - Exposez l'API sur un domaine de tracking (ex. `t.monentreprise.ci`) et renseignez `API_PUBLIC_URL`.
@@ -167,7 +177,8 @@ pnpm build
 - [ ] Éditeur visuel de séquences (React Flow) et éditeur de templates
 - [ ] Réseau de warm-up entre boîtes et mesure du placement en boîte de réception
 - [x] Comptes utilisateurs, sessions, invitations et rôles
-- [ ] Envoi automatique des e-mails d'invitation et de réinitialisation du mot de passe
+- [x] Envoi automatique des e-mails système (invitation, mot de passe oublié, alertes)
+- [x] Application Windows autonome
 - [ ] Abonnements (Stripe, Mobile Money via CinetPay ou Paystack)
 - [ ] Boîte de réception unifiée avec classification IA des réponses
 

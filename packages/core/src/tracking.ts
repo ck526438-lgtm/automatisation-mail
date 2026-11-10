@@ -101,3 +101,22 @@ export function isLikelyBotClick(sentAt: Date, clickedAt: Date, userAgent = ""):
   if (clickedAt.getTime() - sentAt.getTime() < 5000) return true;
   return /bot|crawler|spider|Barracuda|Mimecast|ProofPoint|SafeLinks|python-requests|curl|wget/i.test(userAgent);
 }
+
+/** Pied de message quand aucun lien n'est joignable : désinscription par simple réponse. */
+export function appendReplyStopFooter(body: { html: string; text: string }, opts: { senderName: string; postalAddress: string }): { html: string; text: string } {
+  const line = "Pour ne plus recevoir de messages de ma part, répondez simplement « STOP ».";
+  const address = [opts.senderName, opts.postalAddress].filter(Boolean).join(" · ");
+  const htmlFooter = `<p style="font-size:12px;color:#777;margin-top:24px">${address}<br>${line}</p>`;
+  const html = /<\/body>/i.test(body.html) ? body.html.replace(/<\/body>/i, `${htmlFooter}</body>`) : body.html + htmlFooter;
+  return { html, text: `${body.text}\n\n--\n${address}\n${line}` };
+}
+
+/** Vrai si l'adresse ne désigne que ce poste (localhost, 127.x, ::1) : inaccessible aux destinataires. */
+export function isLoopback(url: string): boolean {
+  try {
+    const h = new URL(url).hostname.replace(/^\[|\]$/g, "");
+    return h === "localhost" || h.endsWith(".localhost") || h === "::1" || /^127\./.test(h) || h === "0.0.0.0";
+  } catch {
+    return true;
+  }
+}

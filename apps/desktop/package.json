@@ -1,0 +1,26 @@
+{
+  "name": "@am/desktop",
+  "productName": "Automatisation Mail",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "Application Windows d'Automatisation Mail : tout fonctionne sur le poste, sans serveur.",
+  "scripts": {
+    "dist": "node scripts/build.mjs && electron-builder --config electron-builder.json --win --x64 --publish never",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"(test de bout en bout : pnpm --filter @am/desktop build && pnpm --filter @am/desktop smoke)\"",
+    "smoke": "node scripts/smoke.mjs",
+    "stage": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@am/api": "workspace:*",
+    "@am/core": "workspace:*",
+    "@am/db": "workspace:*",
+    "@am/worker": "workspace:*",
+    "electron": "33.2.1",
+    "electron-builder": "^25.1.8",
+    "esbuild": "^0.24.2",
+    "mailparser": "^3",
+    "smtp-server": "^3"
+  }
+}

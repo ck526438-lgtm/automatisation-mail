@@ -99,3 +99,5 @@ code { font-size: 12px; word-break: break-all; }
 .whoami { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .linkbtn { appearance: none; background: none; border: 0; padding: 4px 0 0; color: var(--blue); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
 @media (max-width: 820px) { .whoami { margin: 0 0 0 auto; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--line); white-space: nowrap; } }
+.checklist { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; font-size: 14px; }
+.checklist li.done { color: var(--muted); text-decoration: line-through; }

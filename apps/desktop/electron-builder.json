@@ -1,0 +1,34 @@
+{
+  "appId": "ci.automatisation-mail.app",
+  "productName": "Automatisation Mail",
+  "copyright": "© 2026 Automatisation Mail",
+  "electronVersion": "33.2.1",
+  "directories": { "app": "stage/app", "output": "dist", "buildResources": "assets" },
+  "files": ["**/*", "!**/*.map"],
+  "asar": true,
+  "asarUnpack": ["node_modules/@electric-sql/pglite/**"],
+  "extraResources": [
+    { "from": "stage/resources/migrations", "to": "migrations" },
+    { "from": "stage/resources/web", "to": "web" },
+    { "from": "stage/resources/assets", "to": "assets" }
+  ],
+  "npmRebuild": false,
+  "win": {
+    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "icon": "assets/icon.ico",
+    "artifactName": "Automatisation-Mail-Setup-${version}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Automatisation Mail",
+    "installerIcon": "assets/icon.ico",
+    "uninstallerIcon": "assets/icon.ico",
+    "deleteAppDataOnUninstall": false,
+    "language": "1036",
+    "runAfterFinish": true
+  }
+}

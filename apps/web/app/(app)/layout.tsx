@@ -38,7 +38,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           <div className="whoami">
             <b>{me.data.user.name ?? me.data.user.email}</b>
             <span className="muted">{me.data.org.name} · {ROLE_LABELS[me.data.role]}</span>
-            <form action={logout}><button className="linkbtn">Se déconnecter</button></form>
+            {me.data.mode === "server" && <form action={logout}><button className="linkbtn">Se déconnecter</button></form>}
           </div>
         )}
       </aside>
