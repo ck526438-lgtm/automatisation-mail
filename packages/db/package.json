@@ -1,0 +1,30 @@
+{
+  "name": "@am/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Schéma PostgreSQL (Drizzle ORM), client et données de démonstration.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"(pas de test unitaire pour @am/db)\"",
+    "push": "drizzle-kit push",
+    "generate": "drizzle-kit generate",
+    "seed": "tsx --env-file-if-exists=../../.env src/seed.ts"
+  },
+  "dependencies": {
+    "@am/core": "workspace:*",
+    "drizzle-orm": "^0.38.3",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.30.1"
+  }
+}

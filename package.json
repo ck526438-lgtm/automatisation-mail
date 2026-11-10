@@ -1,0 +1,24 @@
+{
+  "name": "automatisation-mail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SaaS B2B d'automatisation d'e-mails : séquences, workflows conditionnels, délivrabilité et conformité.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "dev": "pnpm --filter \"./packages/**\" build && pnpm --parallel --filter \"./apps/**\" dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:push": "pnpm --filter @am/db push",
+    "db:seed": "pnpm --filter @am/db seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
