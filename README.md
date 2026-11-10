@@ -22,9 +22,10 @@
 | --- | --- |
 | **Contacts** | Import CSV (séparateur `,` ou `;`, mapping automatique des colonnes en français/anglais), API unitaire et en lot (1 000/appel), dédoublonnage (`ignorer`, `écraser`, `compléter`), rejet des adresses invalides et jetables, tags, segments dynamiques ET/OU/NON compilés en SQL paramétré |
 | **Séquences** | Moteur de workflow en graphe (DAG) : e-mail, attente, condition (ouvert, cliqué, répondu, tag, champ), attente d'événement avec délai, actions (tag, webhook, statut), fin. Versionnement : un contact reste sur la version où il a été inscrit |
-| **Envoi** | Workers BullMQ, SMTP par boîte (mots de passe chiffrés AES-256-GCM), rotation des boîtes, relances dans le même fil (`In-Reply-To`), spintax et variables avec valeurs de repli, fenêtres horaires dans le fuseau du contact, espacement aléatoire entre envois, idempotence (aucun double envoi) |
+| **Boîtes** | Connexion Google Workspace et Microsoft 365 en un clic (OAuth, jetons chiffrés et rafraîchis automatiquement, détection des révocations), ou SMTP + IMAP pour les autres hébergeurs. Voir [docs/oauth.md](docs/oauth.md) |
+| **Envoi** | Workers BullMQ, envoi par API Gmail, Microsoft Graph ou SMTP avec un MIME identique, rotation des boîtes, relances dans le même fil (`In-Reply-To`), spintax et variables avec valeurs de repli, fenêtres horaires dans le fuseau du contact, espacement aléatoire entre envois, idempotence (aucun double envoi) |
 | **Délivrabilité** | Vérification SPF (dont limite des 10 requêtes DNS), DKIM (taille de clé), DMARC (politique), MX. Plan de warm-up progressif, score de santé par boîte, freinage automatique (volume divisé par 2 sous 70, arrêt sous 50), pause de campagne au-delà de 5 % de rebonds ou 0,3 % de plaintes, analyse anti-spam du contenu |
-| **Rebonds & réponses** | Classification hard / soft / bloc (codes SMTP et RFC 3463), rejets SMTP synchrones, webhooks génériques et Amazon SES, détection des réponses automatiques (RFC 3834) qui ne stoppent pas la séquence |
+| **Rebonds & réponses** | Lecture automatique des boîtes toutes les 2 minutes (Gmail, Microsoft Graph, IMAP) : réponses rattachées par `In-Reply-To` / `References`, rapports de non-remise (RFC 3464, Gmail, Exchange) analysés, déduplication entre passages. Classification hard / soft / bloc, webhooks génériques et Amazon SES en complément, réponses automatiques (RFC 3834) qui ne stoppent pas la séquence |
 | **Tracking** | Pixel d'ouverture (désactivé par défaut en prospection), redirection des clics avec jetons signés HMAC, filtrage des ouvertures et clics de robots (proxys d'images, scanners de sécurité), statistiques par campagne et par étape |
 | **Conformité** | Lien de désinscription et adresse postale injectés dans chaque e-mail, en-têtes `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058, exigés par Gmail et Yahoo), liste de suppression par organisation et globale, journal du consentement, export et effacement d'un contact (droits RGPD) |
 | **Interface** | Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (santé, warm-up, quotas), vérificateur DNS |
@@ -126,13 +127,14 @@ curl -X POST localhost:4000/v1/campaigns/<id>/start -H "x-api-key: dev-key-chang
 ## Tests
 
 ```bash
-pnpm test        # 38 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, API
+pnpm test        # 52 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, API
 pnpm typecheck
 pnpm build
 ```
 
 ## Mise en production
 
+- Créez les applications OAuth Google et Microsoft et renseignez leurs identifiants : [docs/oauth.md](docs/oauth.md).
 - Générez des secrets : `ENCRYPTION_KEY` (`openssl rand -hex 32`), `TRACKING_SECRET`, `WEBHOOK_SECRET`. L'API refuse de démarrer en production avec les valeurs par défaut.
 - Images Docker : `docker build --target api .` et `docker build --target worker .`. Le worker se met à l'échelle indépendamment de l'API.
 - Exposez l'API sur un domaine de tracking (ex. `t.monentreprise.ci`) et renseignez `API_PUBLIC_URL`.
@@ -144,7 +146,7 @@ pnpm build
 - [x] Phase 0 — Monorepo, multi-tenant, files de jobs
 - [x] Phase 2 — Contacts, import, dédoublonnage, suppression, séquences, scheduler
 - [x] Phase 3 (partiel) — Workflow conditionnel, tracking, statistiques, segments
-- [ ] Connexion Gmail et Microsoft 365 en OAuth, synchronisation IMAP des réponses
+- [x] Connexion Gmail et Microsoft 365 en OAuth, lecture des réponses et rebonds (Gmail, Graph, IMAP)
 - [ ] Éditeur visuel de séquences (React Flow) et éditeur de templates
 - [ ] Réseau de warm-up entre boîtes et mesure du placement en boîte de réception
 - [ ] Authentification des utilisateurs de l'interface, gestion des rôles

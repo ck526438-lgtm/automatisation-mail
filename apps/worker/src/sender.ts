@@ -12,7 +12,8 @@ import {
   sendingAccounts, sendingDomains, sql, templates, workflowVersions, type Db,
 } from "@am/db";
 import { config } from "./config.js";
-import { transportFor } from "./transport.js";
+import { sendMessage, SendError } from "./mailbox/send.js";
+import { MailboxDisconnectedError } from "./mailbox/tokens.js";
 import type { SendJob } from "./scheduler.js";
 
 async function postpone(job: Job<SendJob>, token: string | undefined, until: Date, reason: string): Promise<never> {
@@ -108,9 +109,9 @@ export function makeSendProcessor(db: Db) {
       style: campaign?.type === "cold" ? "prospection" : "newsletter",
     });
 
-    // 7. Envoi.
+    // 7. Envoi (SMTP, Gmail API ou Microsoft Graph).
     try {
-      await transportFor(account).sendMail({
+      await sendMessage(db, account, {
         from: account.fromName ? { name: account.fromName, address: account.email } : account.email,
         to: [contact.firstName, contact.lastName].filter(Boolean).length ? { name: [contact.firstName, contact.lastName].filter(Boolean).join(" "), address: contact.email } : contact.email,
         subject,
@@ -122,12 +123,15 @@ export function makeSendProcessor(db: Db) {
         headers: { ...unsubscribeHeaders(unsub), "X-AM-Message": msg.id },
       });
     } catch (err) {
-      const e = err as Error & { responseCode?: number; response?: string };
-      if (e.responseCode && e.responseCode >= 500) {
+      if (err instanceof SendError && err.permanent) {
         // Refus définitif du serveur destinataire : traité comme un rebond.
         await db.update(messages).set({ subject, sentAt: new Date(), status: "sent" }).where(eq(messages.id, msg.id));
-        await handleBounce(db, { messageId: msg.id }, { code: e.responseCode, message: e.response ?? e.message });
+        await handleBounce(db, { messageId: msg.id }, { code: err.responseCode && err.responseCode >= 500 ? err.responseCode : 550, message: err.message });
         return "rejeté (rebond)";
+      }
+      if (err instanceof MailboxDisconnectedError) {
+        // Boîte déconnectée : on réessaie dans une heure, le temps que l'utilisateur la reconnecte.
+        return postpone(job, token, new Date(Date.now() + 3_600_000), err.message);
       }
       throw err; // erreur temporaire : BullMQ réessaie avec backoff exponentiel
     }

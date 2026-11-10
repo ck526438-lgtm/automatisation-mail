@@ -3,6 +3,7 @@
  * Chaque table métier porte `org_id` : l'isolation multi-tenant est appliquée
  * dans toutes les requêtes et peut être renforcée par Row-Level Security (voir sql/rls.sql).
  */
+import { sql } from "drizzle-orm";
 import {
   boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid,
 } from "drizzle-orm/pg-core";
@@ -57,8 +58,22 @@ export const sendingAccounts = pgTable("sending_accounts", {
   smtpPort: integer("smtp_port"),
   smtpSecure: boolean("smtp_secure").notNull().default(false),
   smtpUser: text("smtp_user"),
-  /** Mot de passe ou jeton chiffré (AES-256-GCM, voir @am/core/crypto) */
+  /** Mot de passe SMTP/IMAP chiffré (AES-256-GCM, voir @am/core/crypto) */
   credentialsEnc: text("credentials_enc"),
+  /** IMAP, pour lire réponses et rebonds des boîtes SMTP (même identifiant que SMTP) */
+  imapHost: text("imap_host"),
+  imapPort: integer("imap_port"),
+  imapSecure: boolean("imap_secure").notNull().default(true),
+  /** Jetons OAuth chiffrés (Gmail, Microsoft 365) */
+  oauthRefreshEnc: text("oauth_refresh_enc"),
+  oauthAccessEnc: text("oauth_access_enc"),
+  oauthExpiresAt: timestamp("oauth_expires_at", { withTimezone: true }),
+  /** Le fournisseur a révoqué l'accès : l'utilisateur doit reconnecter la boîte */
+  needsReconnect: boolean("needs_reconnect").notNull().default(false),
+  /** Curseur de synchronisation : historyId Gmail, date ISO Graph, dernier UID IMAP */
+  syncCursor: text("sync_cursor"),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  syncError: text("sync_error"),
   dailyLimit: integer("daily_limit").notNull().default(50),
   warmupEnabled: boolean("warmup_enabled").notNull().default(true),
   warmupStartedAt: timestamp("warmup_started_at", { withTimezone: true }).notNull().defaultNow(),
@@ -213,6 +228,8 @@ export const events = pgTable("events", {
 }, (t) => [
   index("events_campaign_type_idx").on(t.orgId, t.campaignId, t.type, t.occurredAt),
   index("events_contact_idx").on(t.contactId, t.occurredAt),
+  // Déduplication des messages entrants lors des synchronisations successives
+  index("events_inbound_idx").on(sql`(${t.meta} ->> 'inboundId')`),
 ]);
 
 /** Liste de suppression : org_id nul = suppression globale à la plateforme. */

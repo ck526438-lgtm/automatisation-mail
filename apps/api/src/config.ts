@@ -6,6 +6,10 @@ export const config = {
   trackingSecret: process.env.TRACKING_SECRET ?? "change-me",
   webhookSecret: process.env.WEBHOOK_SECRET ?? "",
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
+  /** Adresse de l'interface, vers laquelle on revient après une connexion OAuth */
+  webUrl: process.env.WEB_URL ?? "http://localhost:3000",
+  google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
+  microsoft: { clientId: process.env.MICROSOFT_CLIENT_ID ?? "", clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? "" },
 };
 
 if (process.env.NODE_ENV === "production") {

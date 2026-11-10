@@ -9,6 +9,7 @@ import { registerDeliverabilityRoutes } from "./routes/deliverability.js";
 import { registerContentRoutes } from "./routes/content.js";
 import { registerTrackingRoutes } from "./routes/tracking.js";
 import { registerWebhookRoutes } from "./routes/webhooks.js";
+import { registerOAuthCallbackRoute, registerOAuthStartRoute } from "./routes/oauth.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -44,6 +45,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   // Routes publiques (tracking, désinscription, webhooks entrants)
   registerTrackingRoutes(app, deps);
   registerWebhookRoutes(app, deps);
+  registerOAuthCallbackRoute(app, deps);
 
   // Routes authentifiées par clé API d'organisation
   await app.register(async (v1) => {
@@ -58,6 +60,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     registerCampaignRoutes(v1, deps);
     registerDeliverabilityRoutes(v1, deps);
     registerContentRoutes(v1, deps);
+    registerOAuthStartRoute(v1);
   }, { prefix: "/v1" });
 
   return app;

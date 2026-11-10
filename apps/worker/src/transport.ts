@@ -10,7 +10,7 @@ const cache = new Map<string, { transporter: Transporter; key: string }>();
 /** Transport SMTP par boîte, mis en cache et recréé si la configuration change. */
 export function transportFor(account: Account): Transporter {
   if (account.provider !== "smtp") {
-    throw new Error(`Fournisseur « ${account.provider} » pas encore pris en charge : utilisez SMTP (Gmail et Microsoft via OAuth arrivent en phase 1).`);
+    throw new Error(`transportFor() ne gère que SMTP ; « ${account.provider} » passe par mailbox/send.ts`);
   }
   const key = [account.smtpHost, account.smtpPort, account.smtpSecure, account.smtpUser, account.credentialsEnc].join("|");
   const hit = cache.get(account.id);

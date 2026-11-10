@@ -125,7 +125,7 @@ export async function checkCampaignHealth(db: Db, campaignId: string): Promise<v
 }
 
 /** Traite un rebond rattaché à un message envoyé (par son en-tête Message-ID ou son id interne). */
-export async function handleBounce(db: Db, ref: { messageIdHeader?: string; messageId?: string }, input: BounceInput) {
+export async function handleBounce(db: Db, ref: { messageIdHeader?: string; messageId?: string }, input: BounceInput, extraMeta: Record<string, unknown> = {}) {
   const where = ref.messageId ? eq(s.messages.id, ref.messageId) : eq(s.messages.messageIdHeader, ref.messageIdHeader ?? "");
   const [msg] = await db.select().from(s.messages).where(where).limit(1);
   if (!msg) return null;
@@ -133,19 +133,19 @@ export async function handleBounce(db: Db, ref: { messageIdHeader?: string; mess
   await db.update(s.messages).set({ status: "bounced", error: input.message ?? verdict.reason }).where(eq(s.messages.id, msg.id));
   await recordEvent(db, {
     orgId: msg.orgId, type: "bounce", messageId: msg.id, contactId: msg.contactId, campaignId: msg.campaignId,
-    nodeId: msg.nodeId, meta: { kind: verdict.kind, reason: verdict.reason, code: input.code, enhanced: input.enhanced },
+    nodeId: msg.nodeId, meta: { kind: verdict.kind, reason: verdict.reason, code: input.code, enhanced: input.enhanced, ...extraMeta },
   });
   return verdict;
 }
 
 /** Traite une réponse entrante rattachée par In-Reply-To / References. */
-export async function handleReply(db: Db, input: { inReplyTo: string[]; from: string; subject?: string; snippet?: string; autoReply?: boolean }) {
+export async function handleReply(db: Db, input: { inReplyTo: string[]; from: string; subject?: string; snippet?: string; autoReply?: boolean; extraMeta?: Record<string, unknown> }) {
   for (const ref of input.inReplyTo) {
     const [msg] = await db.select().from(s.messages).where(eq(s.messages.messageIdHeader, ref.replace(/[<>]/g, ""))).limit(1);
     if (!msg) continue;
     await recordEvent(db, {
       orgId: msg.orgId, type: input.autoReply ? "auto_reply" : "reply", messageId: msg.id, contactId: msg.contactId,
-      campaignId: msg.campaignId, nodeId: msg.nodeId, meta: { from: input.from, subject: input.subject, snippet: input.snippet?.slice(0, 500) },
+      campaignId: msg.campaignId, nodeId: msg.nodeId, meta: { from: input.from, subject: input.subject, snippet: input.snippet?.slice(0, 500), ...input.extraMeta },
     });
     return msg;
   }
@@ -158,4 +158,11 @@ export function isAutoReply(headers: Record<string, string | undefined>, subject
   if (h["auto-submitted"] && h["auto-submitted"] !== "no") return true;
   if (h["x-autoreply"] || h["x-autorespond"] || h["precedence"] === "auto_reply") return true;
   return /^(absence|out of office|automatic reply|réponse automatique|auto[- ]?reply|en congé)/i.test(subject.trim());
+}
+
+/** Vrai si ce message entrant (identifiant fournisseur) a déjà été traité : la synchro peut repasser dessus. */
+export async function inboundAlreadyProcessed(db: Db, accountId: string, inboundId: string): Promise<boolean> {
+  const { rows } = await db.execute(sql`
+    select 1 from events where meta->>'inboundId' = ${inboundId} and meta->>'accountId' = ${accountId} limit 1`);
+  return rows.length > 0;
 }

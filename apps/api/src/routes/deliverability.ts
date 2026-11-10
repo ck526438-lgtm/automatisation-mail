@@ -37,7 +37,10 @@ export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDe
       id: sendingAccounts.id, email: sendingAccounts.email, fromName: sendingAccounts.fromName, provider: sendingAccounts.provider,
       dailyLimit: sendingAccounts.dailyLimit, healthScore: sendingAccounts.healthScore, paused: sendingAccounts.paused,
       warmupEnabled: sendingAccounts.warmupEnabled, warmupStartedAt: sendingAccounts.warmupStartedAt,
-      sentToday: sql<number>`(select count(*)::int from messages m where m.sending_account_id = ${sendingAccounts.id} and m.sent_at >= date_trunc('day', now()))`,
+      needsReconnect: sendingAccounts.needsReconnect, lastSyncAt: sendingAccounts.lastSyncAt, syncError: sendingAccounts.syncError,
+      inboxSync: sql<boolean>`(${sendingAccounts.provider} in ('gmail','outlook') or ${sendingAccounts.imapHost} is not null)`,
+      // Colonne qualifiée explicitement : dans une sous-requête, Drizzle écrirait « id » sans table.
+      sentToday: sql<number>`(select count(*)::int from messages m where m.sending_account_id = "sending_accounts"."id" and m.sent_at >= date_trunc('day', now()))`,
     }).from(sendingAccounts).where(eq(sendingAccounts.orgId, req.orgId));
     return rows.map((a) => {
       const day = Math.floor((Date.now() - a.warmupStartedAt.getTime()) / 86_400_000);
@@ -57,6 +60,10 @@ export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDe
       smtpPassword: z.string().default(""),
       dailyLimit: z.number().int().min(1).max(2000).default(50),
       warmupEnabled: z.boolean().default(true),
+      // IMAP facultatif : permet de détecter réponses et rebonds dans la boîte SMTP.
+      imapHost: z.string().optional(),
+      imapPort: z.number().int().default(993),
+      imapSecure: z.boolean().default(true),
     }).parse(req.body);
     const domain = body.email.split("@")[1]!.toLowerCase();
     const [d] = await db.select({ id: sendingDomains.id }).from(sendingDomains)
@@ -65,6 +72,7 @@ export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDe
       orgId: req.orgId, domainId: d?.id, email: body.email, fromName: body.fromName, provider: "smtp",
       smtpHost: body.smtpHost, smtpPort: body.smtpPort, smtpSecure: body.smtpSecure, smtpUser: body.smtpUser,
       credentialsEnc: encryptSecret(body.smtpPassword, config.encryptionKey), dailyLimit: body.dailyLimit, warmupEnabled: body.warmupEnabled,
+      imapHost: body.imapHost, imapPort: body.imapHost ? body.imapPort : null, imapSecure: body.imapSecure,
     }).returning({ id: sendingAccounts.id, email: sendingAccounts.email });
     return reply.status(201).send(a);
   });

@@ -10,4 +10,8 @@ export const config = {
   /** Écart minimal / maximal entre deux envois d'une même boîte, en secondes */
   minGapSeconds: Number(process.env.MIN_GAP_SECONDS ?? 60),
   maxGapSeconds: Number(process.env.MAX_GAP_SECONDS ?? 300),
+  /** Fréquence de lecture des boîtes (réponses, rebonds) */
+  inboxSyncIntervalMs: Number(process.env.INBOX_SYNC_INTERVAL_MS ?? 120_000),
+  google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
+  microsoft: { clientId: process.env.MICROSOFT_CLIENT_ID ?? "", clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? "" },
 };

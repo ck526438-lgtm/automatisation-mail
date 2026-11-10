@@ -68,6 +68,10 @@ export interface Account {
   warmupDay: number;
   sentToday: number;
   todayPlan: { warmup: number; campaign: number };
+  needsReconnect: boolean;
+  inboxSync: boolean;
+  lastSyncAt: string | null;
+  syncError: string | null;
 }
 
 export interface ProtocolResult {
