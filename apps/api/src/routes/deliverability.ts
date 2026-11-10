@@ -4,12 +4,14 @@ import { checkDomain, encryptSecret, warmupPlan } from "@am/core";
 import { and, eq, sendingAccounts, sendingDomains, sql } from "@am/db";
 import type { AppDeps } from "../app.js";
 import { config } from "../config.js";
+import { requireRole } from "../auth.js";
 
 export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDeps) {
   app.get("/domains", async (req) => db.select().from(sendingDomains).where(eq(sendingDomains.orgId, req.orgId)));
 
   /** Ajoute un domaine et lance immédiatement la vérification SPF / DKIM / DMARC / MX. */
   app.post("/domains", async (req, reply) => {
+    requireRole(req, "admin");
     const body = z.object({
       domain: z.string().regex(/^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)+$/i, "Nom de domaine invalide"),
       dkimSelectors: z.array(z.string()).optional(),
@@ -50,6 +52,7 @@ export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDe
 
   /** Ajoute une boîte SMTP. Le mot de passe est chiffré et n'est jamais renvoyé. */
   app.post("/accounts", async (req, reply) => {
+    requireRole(req, "admin");
     const body = z.object({
       email: z.string().email(),
       fromName: z.string().default(""),
@@ -78,6 +81,7 @@ export function registerDeliverabilityRoutes(app: FastifyInstance, { db }: AppDe
   });
 
   app.patch<{ Params: { id: string } }>("/accounts/:id", async (req, reply) => {
+    requireRole(req, "admin");
     const body = z.object({ paused: z.boolean().optional(), dailyLimit: z.number().int().min(1).max(2000).optional(), fromName: z.string().optional() }).parse(req.body);
     const [a] = await db.update(sendingAccounts).set(body)
       .where(and(eq(sendingAccounts.id, req.params.id), eq(sendingAccounts.orgId, req.orgId))).returning({ id: sendingAccounts.id });

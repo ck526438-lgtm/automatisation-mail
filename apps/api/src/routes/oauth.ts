@@ -12,6 +12,7 @@ import {
 import { and, eq, sendingAccounts, sendingDomains } from "@am/db";
 import type { AppDeps } from "../app.js";
 import { config } from "../config.js";
+import { requireRole } from "../auth.js";
 
 const providerSchema = z.enum(["gmail", "outlook"]);
 
@@ -25,6 +26,7 @@ const NAMES: Record<OAuthProvider, string> = { gmail: "Google", outlook: "Micros
 
 export function registerOAuthStartRoute(app: FastifyInstance) {
   app.get<{ Params: { provider: string }; Querystring: { loginHint?: string } }>("/oauth/:provider/start", async (req, reply) => {
+    requireRole(req, "admin");
     const provider = providerSchema.parse(req.params.provider);
     const client = oauthClient(provider);
     if (!client) {

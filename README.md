@@ -28,7 +28,8 @@
 | **Rebonds & réponses** | Lecture automatique des boîtes toutes les 2 minutes (Gmail, Microsoft Graph, IMAP) : réponses rattachées par `In-Reply-To` / `References`, rapports de non-remise (RFC 3464, Gmail, Exchange) analysés, déduplication entre passages. Classification hard / soft / bloc, webhooks génériques et Amazon SES en complément, réponses automatiques (RFC 3834) qui ne stoppent pas la séquence |
 | **Tracking** | Pixel d'ouverture (désactivé par défaut en prospection), redirection des clics avec jetons signés HMAC, filtrage des ouvertures et clics de robots (proxys d'images, scanners de sécurité), statistiques par campagne et par étape |
 | **Conformité** | Lien de désinscription et adresse postale injectés dans chaque e-mail, en-têtes `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058, exigés par Gmail et Yahoo), liste de suppression par organisation et globale, journal du consentement, export et effacement d'un contact (droits RGPD) |
-| **Interface** | Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (santé, warm-up, quotas), vérificateur DNS |
+| **Comptes & équipe** | Inscription (création d'organisation), connexion par e-mail et mot de passe (scrypt), sessions en cookie httpOnly, blocage après 5 essais, invitations à usage unique valables 7 jours, rôles propriétaire / administrateur / membre, journal d'activité, clé API régénérable pour les intégrations |
+| **Interface** | Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (connexion, santé, warm-up, quotas), vérificateur DNS, équipe et réglages |
 
 ## Architecture
 
@@ -64,14 +65,22 @@ pnpm dev                      # API :4000, worker, interface :3000
 
 Puis :
 
-1. Ouvrez http://localhost:3000, allez dans **Campagnes**, cliquez **Inscrire tous** puis **Démarrer**.
-2. Les e-mails arrivent dans Mailpit : http://localhost:8025.
+1. Ouvrez http://localhost:3000 et connectez-vous avec le compte de démo : `demo@automatisation-mail.local` / `Demo-Abidjan-2026`.
+   Ou créez votre propre organisation depuis **Créer une organisation**.
+2. Allez dans **Campagnes**, cliquez **Inscrire tous** puis **Démarrer**.
+3. Les e-mails arrivent dans Mailpit : http://localhost:8025.
 
 En développement, raccourcissez l'espacement entre envois dans `.env` : `MIN_GAP_SECONDS=0` et `MAX_GAP_SECONDS=2`.
 
 ## Exemples d'API
 
-Toutes les routes `/v1` attendent l'en-tête `x-api-key` (clé de démo : `dev-key-change-me`).
+Pour un script ou un CRM, les routes `/v1` acceptent l'en-tête `x-api-key` (droits d'administrateur). La clé de démo est `dev-key-change-me` ; un propriétaire en génère une nouvelle dans **Équipe & réglages**, ce qui désactive l'ancienne.
+
+| Rôle | Peut |
+| --- | --- |
+| Membre | Gérer contacts, segments, templates, séquences et campagnes |
+| Administrateur | En plus : boîtes d'envoi, domaines, équipe, effacement de contacts, réglages, journal |
+| Propriétaire | En plus : clé API. L'organisation garde toujours au moins un propriétaire |
 
 ```bash
 # Importer un CSV
@@ -99,6 +108,13 @@ curl -X POST localhost:4000/v1/campaigns/<id>/start -H "x-api-key: dev-key-chang
 
 | Méthode | Route | Rôle |
 | --- | --- | --- |
+| POST | `/auth/signup` · `/auth/login` · `/auth/logout` | Inscription, connexion (renvoie un jeton de session), déconnexion |
+| GET / POST | `/auth/invitation/:token` · `/auth/accept-invite` | Lire et accepter une invitation |
+| GET / PATCH | `/v1/me` · `/v1/org` | Mon compte (mot de passe) · réglages de l'organisation |
+| GET / PATCH / DELETE | `/v1/users` | Équipe, changement de rôle, retrait |
+| GET / POST / DELETE | `/v1/invitations` | Invitations en attente |
+| POST | `/v1/api-key/rotate` | Nouvelle clé API (propriétaire) |
+| GET | `/v1/audit` | Journal d'activité |
 | GET | `/v1/dashboard` | Indicateurs sur 30 jours |
 | GET / POST | `/v1/contacts` | Lister (filtres `status`, `search`) / créer |
 | POST | `/v1/contacts/bulk` | Créer jusqu'à 1 000 contacts |
@@ -127,7 +143,7 @@ curl -X POST localhost:4000/v1/campaigns/<id>/start -H "x-api-key: dev-key-chang
 ## Tests
 
 ```bash
-pnpm test        # 52 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, API
+pnpm test        # 57 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, mots de passe, rôles, API
 pnpm typecheck
 pnpm build
 ```
@@ -135,6 +151,7 @@ pnpm build
 ## Mise en production
 
 - Créez les applications OAuth Google et Microsoft et renseignez leurs identifiants : [docs/oauth.md](docs/oauth.md).
+- Mettez `ALLOW_SIGNUP=false` si seules vos invitations doivent permettre de créer un compte. Avec plusieurs instances d'API, remplacez la limitation des tentatives de connexion (en mémoire) par un compteur Redis.
 - Générez des secrets : `ENCRYPTION_KEY` (`openssl rand -hex 32`), `TRACKING_SECRET`, `WEBHOOK_SECRET`. L'API refuse de démarrer en production avec les valeurs par défaut.
 - Images Docker : `docker build --target api .` et `docker build --target worker .`. Le worker se met à l'échelle indépendamment de l'API.
 - Exposez l'API sur un domaine de tracking (ex. `t.monentreprise.ci`) et renseignez `API_PUBLIC_URL`.
@@ -149,7 +166,8 @@ pnpm build
 - [x] Connexion Gmail et Microsoft 365 en OAuth, lecture des réponses et rebonds (Gmail, Graph, IMAP)
 - [ ] Éditeur visuel de séquences (React Flow) et éditeur de templates
 - [ ] Réseau de warm-up entre boîtes et mesure du placement en boîte de réception
-- [ ] Authentification des utilisateurs de l'interface, gestion des rôles
+- [x] Comptes utilisateurs, sessions, invitations et rôles
+- [ ] Envoi automatique des e-mails d'invitation et de réinitialisation du mot de passe
 - [ ] Abonnements (Stripe, Mobile Money via CinetPay ou Paystack)
 - [ ] Boîte de réception unifiée avec classification IA des réponses
 

@@ -1,5 +1,5 @@
 import { tryApi, type Campaign, type CampaignStats } from "@/lib/api";
-import { ApiDown, Badge } from "../../ui";
+import { ApiDown, Badge } from "@/app/ui";
 
 export const dynamic = "force-dynamic";
 

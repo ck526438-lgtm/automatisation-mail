@@ -31,8 +31,34 @@ export const users = pgTable("users", {
   name: text("name"),
   role: text("role", { enum: ["owner", "admin", "member"] }).notNull().default("member"),
   passwordHash: text("password_hash"),
+  lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
   createdAt: createdAt(),
 }, (t) => [uniqueIndex("users_email_idx").on(t.email)]);
+
+/** Sessions de l'interface : seule l'empreinte SHA-256 du jeton est stockée. */
+export const sessions = pgTable("sessions", {
+  id: id(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+  createdAt: createdAt(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("sessions_token_idx").on(t.tokenHash), index("sessions_user_idx").on(t.userId)]);
+
+/** Invitations d'équipe : lien à usage unique, valable 7 jours. */
+export const invitations = pgTable("invitations", {
+  id: id(),
+  orgId: orgId(),
+  email: text("email").notNull(),
+  role: text("role", { enum: ["owner", "admin", "member"] }).notNull().default("member"),
+  tokenHash: text("token_hash").notNull(),
+  invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  createdAt: createdAt(),
+}, (t) => [uniqueIndex("invitations_token_idx").on(t.tokenHash), index("invitations_org_idx").on(t.orgId)]);
 
 export const sendingDomains = pgTable("sending_domains", {
   id: id(),

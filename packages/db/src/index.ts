@@ -6,7 +6,7 @@ import * as schema from "./schema.js";
 export * from "./schema.js";
 export * from "./services.js";
 export { schema };
-export { and, or, eq, sql, desc, asc, inArray, isNull, lte, gte, count } from "drizzle-orm";
+export { and, or, eq, ne, sql, desc, asc, inArray, isNull, lte, gte, count } from "drizzle-orm";
 import { sql, type SQL } from "drizzle-orm";
 
 /**

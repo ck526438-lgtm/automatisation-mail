@@ -3,6 +3,7 @@ import { z } from "zod";
 import { applyMapping, dedupeContacts, parseCsv, segmentToSql, suggestMapping, type SegmentRule } from "@am/core";
 import { and, contacts, contactTags, desc, eq, inArray, segments, sql, suppressions, tags, isNull, or, paramSql, type Db } from "@am/db";
 import type { AppDeps } from "../app.js";
+import { audit, requireRole } from "../auth.js";
 
 const contactSchema = z.object({
   email: z.string().min(3),
@@ -137,9 +138,11 @@ export function registerContactRoutes(app: FastifyInstance, { db }: AppDeps) {
 
   app.delete<{ Params: { id: string } }>("/contacts/:id", async (req, reply) => {
     // Droit à l'effacement : suppression du contact, l'adresse reste en liste de suppression pour ne plus être contactée.
+    requireRole(req, "admin");
     const [c] = await db.delete(contacts).where(and(eq(contacts.id, req.params.id), eq(contacts.orgId, req.orgId))).returning();
     if (!c) return reply.status(404).send({ error: "Contact introuvable" });
     await db.insert(suppressions).values({ orgId: req.orgId, emailNormalized: c.emailNormalized, reason: "manual" }).onConflictDoNothing();
+    await audit(db, req, "contact.erase", c.emailNormalized);
     return reply.status(204).send();
   });
 

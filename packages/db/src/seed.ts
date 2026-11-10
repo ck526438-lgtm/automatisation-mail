@@ -3,7 +3,7 @@
  * trois templates, une séquence en 3 étapes et quelques contacts.
  * Lancer : pnpm db:seed (après pnpm db:push)
  */
-import { encryptSecret, normalizeEmail, threeStepColdSequence } from "@am/core";
+import { encryptSecret, hashPassword, normalizeEmail, threeStepColdSequence } from "@am/core";
 import { createDb, hashApiKey } from "./index.js";
 import * as s from "./schema.js";
 
@@ -18,6 +18,12 @@ const [org] = await db.insert(s.organizations).values({
   apiKeyHash: hashApiKey(apiKey),
 }).onConflictDoUpdate({ target: s.organizations.apiKeyHash, set: { name: "Démo Automatisation Mail" } }).returning();
 if (!org) throw new Error("Organisation non créée");
+
+// Compte propriétaire de démonstration pour l'interface
+const demoEmail = process.env.DEMO_EMAIL ?? "demo@automatisation-mail.local";
+const demoPassword = process.env.DEMO_PASSWORD ?? "Demo-Abidjan-2026";
+await db.insert(s.users).values({ orgId: org.id, email: demoEmail, name: "Compte démo", role: "owner", passwordHash: await hashPassword(demoPassword) })
+  .onConflictDoNothing();
 
 const [account] = await db.insert(s.sendingAccounts).values({
   orgId: org.id,
@@ -66,6 +72,7 @@ await db.insert(s.contacts).values(people.map(([email, firstName, lastName, comp
 }))).onConflictDoNothing();
 
 console.log(`✔ Données de démo créées. Organisation ${org.id}`);
+console.log(`  Interface : ${demoEmail} / ${demoPassword}`);
 console.log(`  Clé API : ${apiKey}`);
 console.log(`  Campagne : ${campaign!.id} (inscrivez les contacts via POST /v1/campaigns/:id/enroll)`);
 await pool.end();

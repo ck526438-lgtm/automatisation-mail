@@ -8,6 +8,8 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:3000",
   /** Adresse de l'interface, vers laquelle on revient après une connexion OAuth */
   webUrl: process.env.WEB_URL ?? "http://localhost:3000",
+  /** Inscription libre (création d'organisation). Mettre à false pour n'accepter que les invitations. */
+  allowSignup: (process.env.ALLOW_SIGNUP ?? "true") !== "false",
   google: { clientId: process.env.GOOGLE_CLIENT_ID ?? "", clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "" },
   microsoft: { clientId: process.env.MICROSOFT_CLIENT_ID ?? "", clientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? "" },
 };

@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, tryApi, type Contact } from "@/lib/api";
-import { ApiDown, Badge } from "../ui";
+import { ApiDown, Badge } from "@/app/ui";
 
 export const dynamic = "force-dynamic";
 

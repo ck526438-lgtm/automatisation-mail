@@ -11,3 +11,4 @@ export * from "./crypto.js";
 export * from "./csv.js";
 export * from "./oauth.js";
 export * from "./inbox.js";
+export * from "./auth.js";

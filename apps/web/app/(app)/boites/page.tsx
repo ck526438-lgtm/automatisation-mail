@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { api, ApiError, tryApi, type Account } from "@/lib/api";
-import { ApiDown } from "../ui";
+import { ApiDown } from "@/app/ui";
 
 export const dynamic = "force-dynamic";
 

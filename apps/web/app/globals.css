@@ -87,3 +87,15 @@ code { font-size: 12px; word-break: break-all; }
   main { padding: 20px 16px; }
   .grid2 { grid-template-columns: 1fr; }
 }
+
+/* Connexion, inscription, invitation */
+.auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.auth-card { width: 100%; max-width: 420px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px; }
+.auth-card h1 { font-size: 20px; margin: 8px 0 12px; }
+.auth-logo { display: block; width: 100%; max-height: 150px; object-fit: contain; border-radius: 10px; margin-bottom: 8px; }
+.stack { display: flex; flex-direction: column; gap: 14px; margin: 16px 0; }
+.stack label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.stack label input { font-weight: 400; }
+.whoami { margin-top: auto; padding: 14px 10px 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.linkbtn { appearance: none; background: none; border: 0; padding: 4px 0 0; color: var(--blue); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+@media (max-width: 820px) { .whoami { margin: 0 0 0 auto; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--line); white-space: nowrap; } }
