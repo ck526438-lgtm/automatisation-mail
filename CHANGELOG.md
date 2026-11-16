@@ -19,6 +19,10 @@ de bureau (`apps/desktop/package.json`).
   Linux, y compris sur les pull requests.
 - `docs/windows.md` est remplacé par `docs/applications.md`.
 
+### Corrigé
+- Les modules de l'interface embarquée sont désormais copiés « à plat », sans lien symbolique : l'application installée ne dépend
+  plus du dossier de construction (les liens de pnpm restaient pointés vers lui) et le paquet macOS peut être signé.
+
 ## [0.4.0]
 
 - Application Windows autonome (base embarquée PGlite, API, moteur et interface sur le poste).

@@ -4,7 +4,7 @@
  *   stage/resources/      migrations SQL, interface Next.js autonome, icônes
  */
 import { build } from "esbuild";
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,6 +74,48 @@ rmSync(path.join(webModules, "typescript"), { recursive: true, force: true });
 for (const d of existsSync(path.join(webModules, ".pnpm")) ? readdirSync(path.join(webModules, ".pnpm")) : []) {
   if (d.startsWith("typescript@")) rmSync(path.join(webModules, ".pnpm", d), { recursive: true, force: true });
 }
+
+// Next trace ses dépendances dans l'arborescence de pnpm (node_modules/.pnpm + liens symboliques). Une fois copiés,
+// ces liens pointent encore vers le dossier de construction : l'application installée ne retrouverait pas ses modules,
+// et macOS refuse de signer un paquet qui en contient. On reconstruit donc un node_modules « à plat », sans aucun lien.
+function symlinksIn(dir) {
+  const found = [];
+  for (const name of readdirSync(dir)) {
+    const p = path.join(dir, name);
+    const st = lstatSync(p);
+    if (st.isSymbolicLink()) found.push(p);
+    else if (st.isDirectory()) found.push(...symlinksIn(p));
+  }
+  return found;
+}
+const store = path.join(standalone, "node_modules/.pnpm");
+if (existsSync(store)) {
+  rmSync(webModules, { recursive: true, force: true });
+  rmSync(path.join(res, "web/apps/web/node_modules"), { recursive: true, force: true });
+  const versions = new Map();
+  let count = 0;
+  for (const entry of readdirSync(store)) {
+    const modules = path.join(store, entry, "node_modules");
+    if (entry === "node_modules" || entry.startsWith("typescript@") || !existsSync(modules)) continue;
+    const names = readdirSync(modules).flatMap((n) => (n.startsWith("@") ? readdirSync(path.join(modules, n)).map((m) => `${n}/${m}`) : [n]));
+    for (const name of names) {
+      const src = path.join(modules, name);
+      if (lstatSync(src).isSymbolicLink()) continue; // dépendance d'un autre paquet : copiée depuis sa propre entrée
+      const manifest = path.join(src, "package.json");
+      const version = existsSync(manifest) ? JSON.parse(readFileSync(manifest, "utf8")).version : entry;
+      if (versions.has(name)) {
+        if (versions.get(name) !== version) throw new Error(`Deux versions de ${name} dans l'interface (${versions.get(name)} et ${version}) : arborescence à plat impossible`);
+        continue;
+      }
+      versions.set(name, version);
+      cpSync(src, path.join(webModules, name), { recursive: true });
+      count++;
+    }
+  }
+  step(`Modules de l'interface mis à plat (${count} paquets)`);
+}
+const leftovers = symlinksIn(stage);
+if (leftovers.length) throw new Error(`Liens symboliques restants dans stage/ (${leftovers.length}) : ${leftovers[0]}`);
 
 step("Icônes");
 cpSync(path.join(desktop, "assets"), path.join(res, "assets"), { recursive: true });
