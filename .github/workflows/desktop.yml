@@ -35,11 +35,16 @@ jobs:
             flag: --win
             archs: x64
             artifact: Automatisation-Mail-Windows
-          - name: macOS
+          - name: macOS (puce Apple)
             os: macos-latest
             flag: --mac
-            archs: arm64 x64
-            artifact: Automatisation-Mail-macOS
+            archs: arm64
+            artifact: Automatisation-Mail-macOS-arm64
+          - name: macOS (Intel)
+            os: macos-latest
+            flag: --mac
+            archs: x64
+            artifact: Automatisation-Mail-macOS-x64
           - name: Linux
             os: ubuntu-latest
             flag: --linux
@@ -65,10 +70,18 @@ jobs:
       - name: Construire les installateurs
         working-directory: apps/desktop
         shell: bash
-        # Une architecture à la fois : sur macOS, deux créations de .dmg en parallèle font échouer hdiutil.
+        # Sur les runners macOS, hdiutil échoue parfois à créer le .dmg (« Resource busy ») : une machine par
+        # architecture, et jusqu'à trois essais.
         run: |
           for arch in ${{ matrix.archs }}; do
-            npx electron-builder --config electron-builder.json ${{ matrix.flag }} --$arch --publish never
+            for essai in 1 2 3; do
+              if npx electron-builder --config electron-builder.json ${{ matrix.flag }} --$arch --publish never; then
+                continue 2
+              fi
+              echo "::warning::Construction $arch : essai $essai échoué"
+              sleep 20
+            done
+            exit 1
           done
         env:
           # Pas de certificat de signature : voir docs/applications.md.
