@@ -11,6 +11,7 @@ de bureau (`apps/desktop/package.json`).
 - **Application mobile installable** (Android, iPhone, iPad, ChromeOS) pour la version serveur : manifeste, icônes, raccourcis,
   page « hors connexion », zones sûres et champs adaptés au tactile.
 - Menu de l'icône : **Ouvrir le journal**, **Aide**, **Rechercher une mise à jour**.
+- Publication automatique : une nouvelle version dans `apps/desktop/package.json` fusionnée dans `main` crée le tag et la version GitHub.
 - Sommes de contrôle `SHA256SUMS.txt` jointes à chaque version publiée.
 - Guide [docs/applications.md](docs/applications.md), guide de contribution, politique de sécurité, modèles d'issues et de pull request.
 
