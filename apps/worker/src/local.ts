@@ -1,5 +1,5 @@
 /**
- * Moteur local, sans Redis : utilisé par l'application Windows.
+ * Moteur local, sans Redis : utilisé par l'application de bureau (Windows, macOS, Linux).
  * Tout tourne dans le même processus ; la file d'envoi est la table `messages`
  * (statut « queued », next_attempt_at), donc rien n'est perdu si l'application est fermée.
  */

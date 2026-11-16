@@ -1,0 +1,15 @@
+name: Proposer une amélioration
+description: Une fonctionnalité ou une amélioration d'utilisation
+labels: [amélioration]
+body:
+  - type: textarea
+    id: besoin
+    attributes:
+      label: Le besoin
+      description: Que cherchez-vous à faire, et qu'est-ce qui vous en empêche aujourd'hui ?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: La solution envisagée

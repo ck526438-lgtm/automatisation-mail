@@ -1,5 +1,5 @@
 /**
- * Base embarquée pour l'application Windows : PostgreSQL compilé en WebAssembly (PGlite),
+ * Base embarquée pour l'application de bureau : PostgreSQL compilé en WebAssembly (PGlite),
  * stocké dans un dossier du poste. Même schéma, mêmes requêtes que le mode serveur.
  */
 import { PGlite } from "@electric-sql/pglite";

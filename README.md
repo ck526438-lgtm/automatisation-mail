@@ -12,13 +12,26 @@
   <img alt="Node" src="https://img.shields.io/badge/node-%E2%89%A522.9-1f5fbf">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-1f5fbf">
   <img alt="Statut" src="https://img.shields.io/badge/statut-MVP-f2771f">
-  <img alt="Windows" src="https://github.com/ck526438-lgtm/automatisation-mail/actions/workflows/windows.yml/badge.svg">
+  <a href="https://github.com/ck526438-lgtm/automatisation-mail/actions/workflows/desktop.yml"><img alt="Applications de bureau" src="https://github.com/ck526438-lgtm/automatisation-mail/actions/workflows/desktop.yml/badge.svg"></a>
+  <a href="https://github.com/ck526438-lgtm/automatisation-mail/releases/latest"><img alt="Dernière version" src="https://img.shields.io/github/v/release/ck526438-lgtm/automatisation-mail?label=version&color=f2771f"></a>
 </p>
 
 ---
 
-> **Application Windows** : un installateur `.exe` autonome, sans serveur. Base de données, moteur d'envoi, lecture des boîtes
-> et interface tournent sur le PC. Voir [docs/windows.md](docs/windows.md).
+## Applications
+
+| Système | Application | Fonctionnement |
+| --- | --- | --- |
+| **Windows** 10 / 11 | Installateur `.exe` | Autonome : base, moteur d'envoi et interface sur le poste, sans serveur |
+| **macOS** 11+ (puce Apple et Intel) | Image disque `.dmg` | Autonome |
+| **Linux** x64 | `.AppImage` et `.deb` | Autonome |
+| **Android**, **iPhone**, **iPad** | Application installable depuis le navigateur | Interface de la version serveur |
+
+**[Télécharger la dernière version](https://github.com/ck526438-lgtm/automatisation-mail/releases/latest)** ·
+[Guide d'installation et d'utilisation](docs/applications.md)
+
+L'application de bureau reste active dans la zone de notification quand la fenêtre est fermée, peut démarrer à l'ouverture de session
+et garde toutes les données sur l'ordinateur.
 
 ## Ce que fait le MVP aujourd'hui
 
@@ -34,7 +47,7 @@
 | **Conformité** | Lien de désinscription et adresse postale injectés dans chaque e-mail, en-têtes `List-Unsubscribe` + `List-Unsubscribe-Post` (RFC 8058, exigés par Gmail et Yahoo), liste de suppression par organisation et globale, journal du consentement, export et effacement d'un contact (droits RGPD) |
 | **E-mails système** | Envoi automatique par un SMTP dédié, séparé des boîtes de prospection : invitation d'équipe, mot de passe oublié (lien valable 1 h, à usage unique), avis de changement de mot de passe, alertes aux administrateurs (campagne mise en pause, boîte à reconnecter). File d'envoi avec nouvelles tentatives ; réglable dans l'interface ou par variables d'environnement |
 | **Comptes & équipe** | Inscription (création d'organisation), connexion par e-mail et mot de passe (scrypt), sessions en cookie httpOnly, blocage après 5 essais, invitations à usage unique valables 7 jours, rôles propriétaire / administrateur / membre, journal d'activité, clé API régénérable pour les intégrations |
-| **Interface** | Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (connexion, santé, warm-up, quotas), vérificateur DNS, équipe et réglages |
+| **Interface** | Adaptée au mobile et installable sur l'écran d'accueil. Tableau de bord Next.js : indicateurs, campagnes (démarrer, mettre en pause, inscrire), contacts (import, recherche), boîtes (connexion, santé, warm-up, quotas), vérificateur DNS, équipe et réglages |
 
 ## Architecture
 
@@ -44,7 +57,7 @@ apps/
   worker/    Moteur : scheduler des séquences, envois, lecture des boîtes, e-mails système
              (BullMQ + Redis en mode serveur, file en base en mode application)
   web/       Next.js 15 — interface d'administration
-  desktop/   Electron — application Windows autonome (PGlite, API, moteur et interface embarqués)
+  desktop/   Electron — applications Windows, macOS et Linux autonomes (PGlite, API, moteur et interface embarqués)
 packages/
   core/      Logique métier pure et testée (workflow, rebonds, DNS, templates, segments, warm-up, tracking)
   db/        Schéma PostgreSQL (Drizzle ORM), services partagés, données de démonstration
@@ -150,10 +163,10 @@ curl -X POST localhost:4000/v1/campaigns/<id>/start -H "x-api-key: dev-key-chang
 ## Tests
 
 ```bash
-pnpm test        # 62 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, mots de passe, rôles, API
+pnpm build       # les tests s'appuient sur les paquets construits
+pnpm test        # 65 tests : workflow, rebonds, DNS, templates, segments, fenêtres, warm-up, tracking, chiffrement, CSV, OAuth, DSN, MIME, mots de passe, rôles, API, démarrage automatique
 pnpm typecheck
-pnpm build
-pnpm --filter @am/desktop stage && pnpm --filter @am/desktop smoke   # application Windows de bout en bout
+pnpm --filter @am/desktop stage && pnpm --filter @am/desktop smoke   # application de bureau de bout en bout
 ```
 
 ## Mise en production
@@ -179,8 +192,14 @@ pnpm --filter @am/desktop stage && pnpm --filter @am/desktop smoke   # applicati
 - [x] Comptes utilisateurs, sessions, invitations et rôles
 - [x] Envoi automatique des e-mails système (invitation, mot de passe oublié, alertes)
 - [x] Application Windows autonome
+- [x] Applications macOS et Linux, application mobile installable (Android, iOS)
+- [ ] Signature des installateurs (certificat Windows, notarisation Apple) et mise à jour automatique
 - [ ] Abonnements (Stripe, Mobile Money via CinetPay ou Paystack)
 - [ ] Boîte de réception unifiée avec classification IA des réponses
+
+## Contribuer
+
+Voir [CONTRIBUTING.md](CONTRIBUTING.md), le [journal des modifications](CHANGELOG.md) et la [politique de sécurité](SECURITY.md).
 
 ## Avertissement
 

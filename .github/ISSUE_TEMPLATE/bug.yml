@@ -1,0 +1,37 @@
+name: Signaler un bug
+description: Quelque chose ne fonctionne pas comme prévu
+labels: [bug]
+body:
+  - type: dropdown
+    id: version
+    attributes:
+      label: Où le problème apparaît-il ?
+      options:
+        - Application Windows
+        - Application macOS
+        - Application Linux
+        - Application mobile (Android / iOS)
+        - Version serveur
+    validations:
+      required: true
+  - type: input
+    id: numero
+    attributes:
+      label: Version
+      description: Visible dans le menu de l'icône (« Rechercher une mise à jour »), ou le commit pour la version serveur.
+      placeholder: "0.5.0"
+  - type: textarea
+    id: description
+    attributes:
+      label: Ce qui se passe
+      description: Étapes pour reproduire, résultat obtenu, résultat attendu.
+    validations:
+      required: true
+  - type: textarea
+    id: journal
+    attributes:
+      label: Journal
+      description: >
+        Application de bureau : menu de l'icône → « Ouvrir le journal ». Collez les dernières lignes
+        après avoir retiré adresses e-mail et mots de passe.
+      render: text

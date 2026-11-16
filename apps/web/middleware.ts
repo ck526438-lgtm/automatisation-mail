@@ -14,5 +14,6 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/|logo\\.jpg|favicon).*)"],
+  // Fichiers publics de l'application installable (manifeste, icônes, service worker) : sans session.
+  matcher: ["/((?!_next/|logo\\.jpg|favicon|icons/|manifest\\.webmanifest|sw\\.js|hors-connexion\\.html).*)"],
 };

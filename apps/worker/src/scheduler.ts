@@ -17,7 +17,7 @@ export interface SendJob {
 }
 
 /**
- * File d'envoi. En mode serveur : BullMQ sur Redis. En mode local (application Windows) :
+ * File d'envoi. En mode serveur : BullMQ sur Redis. En mode local (application de bureau) :
  * la table messages elle-même (statut « queued » + next_attempt_at), relue en boucle.
  */
 export interface SendQueue {

@@ -3,18 +3,45 @@
   "productName": "Automatisation Mail",
   "copyright": "© 2026 Automatisation Mail",
   "electronVersion": "33.2.1",
-  "directories": { "app": "stage/app", "output": "dist", "buildResources": "assets" },
-  "files": ["**/*", "!**/*.map"],
+  "directories": {
+    "app": "stage/app",
+    "output": "dist",
+    "buildResources": "assets"
+  },
+  "files": [
+    "**/*",
+    "!**/*.map"
+  ],
   "asar": true,
-  "asarUnpack": ["node_modules/@electric-sql/pglite/**"],
+  "asarUnpack": [
+    "node_modules/@electric-sql/pglite/**"
+  ],
   "extraResources": [
-    { "from": "stage/resources/migrations", "to": "migrations" },
-    { "from": "stage/resources/web", "to": "web" },
-    { "from": "stage/resources/assets", "to": "assets" }
+    {
+      "from": "stage/resources/migrations",
+      "to": "migrations"
+    },
+    {
+      "from": "stage/resources/web",
+      "to": "web"
+    },
+    {
+      "from": "stage/resources/assets",
+      "to": "assets"
+    }
   ],
   "npmRebuild": false,
+  "publish": null,
+  "afterPack": "scripts/after-pack.cjs",
   "win": {
-    "target": [{ "target": "nsis", "arch": ["x64"] }],
+    "target": [
+      {
+        "target": "nsis",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
     "icon": "assets/icon.ico",
     "artifactName": "Automatisation-Mail-Setup-${version}.${ext}"
   },
@@ -30,5 +57,52 @@
     "deleteAppDataOnUninstall": false,
     "language": "1036",
     "runAfterFinish": true
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64",
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/icon.png",
+    "category": "public.app-category.business",
+    "identity": null,
+    "darkModeSupport": true,
+    "artifactName": "Automatisation-Mail-${version}-mac-${arch}.${ext}"
+  },
+  "dmg": {
+    "title": "Automatisation Mail ${version}",
+    "sign": false
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": [
+          "x64"
+        ]
+      },
+      {
+        "target": "deb",
+        "arch": [
+          "x64"
+        ]
+      }
+    ],
+    "icon": "assets/icon.png",
+    "category": "Office",
+    "executableName": "automatisation-mail",
+    "synopsis": "Séquences d'e-mails B2B, sur votre poste",
+    "maintainer": "ck526438-lgtm <ck526438-lgtm@users.noreply.github.com>",
+    "artifactName": "Automatisation-Mail-${version}-linux-${arch}.${ext}",
+    "desktop": {
+      "Name": "Automatisation Mail",
+      "Comment": "Séquences d'e-mails B2B, délivrabilité et conformité",
+      "StartupWMClass": "Automatisation Mail"
+    }
   }
 }
