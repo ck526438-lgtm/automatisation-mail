@@ -10,7 +10,7 @@ export const config = {
   webUrl: process.env.WEB_URL ?? "http://localhost:3000",
   /** Inscription libre (création d'organisation). Mettre à false pour n'accepter que les invitations. */
   allowSignup: (process.env.ALLOW_SIGNUP ?? "true") !== "false",
-  /** « server » (SaaS multi-organisations) ou « desktop » (application Windows, un seul poste) */
+  /** « server » (SaaS multi-organisations) ou « desktop » (application de bureau, un seul poste) */
   mode: (process.env.AM_MODE === "desktop" ? "desktop" : "server") as "desktop" | "server",
   /** Mode serveur : adresses autorisées à régler le SMTP des e-mails système (séparées par des virgules) */
   platformAdmins: (process.env.PLATFORM_ADMINS ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),

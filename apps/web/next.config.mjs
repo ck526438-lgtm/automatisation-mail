@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Serveur autonome : utilisé par l'image Docker et embarqué dans l'application Windows.
+  // Serveur autonome : utilisé par l'image Docker et embarqué dans les applications de bureau.
   output: "standalone",
   outputFileTracingRoot: path.join(path.dirname(fileURLToPath(import.meta.url)), "../.."),
   reactStrictMode: true,

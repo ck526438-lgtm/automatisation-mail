@@ -101,3 +101,16 @@ code { font-size: 12px; word-break: break-all; }
 @media (max-width: 820px) { .whoami { margin: 0 0 0 auto; padding: 0 0 0 12px; border-top: 0; border-left: 1px solid var(--line); white-space: nowrap; } }
 .checklist { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; font-size: 14px; }
 .checklist li.done { color: var(--muted); text-decoration: line-through; }
+
+/* Application installée sur mobile : zones sûres (encoche, barre d'accueil) et cibles tactiles confortables. */
+body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); -webkit-text-size-adjust: 100%; }
+@media (max-width: 820px) {
+  main { padding: 20px 16px 40px; }
+  .nav { display: flex; gap: 2px; }
+  .nav a { white-space: nowrap; padding: 10px 12px; }
+  .grid2 { grid-template-columns: 1fr; }
+  .panel { overflow-x: auto; }
+  /* 16 px minimum : évite le zoom automatique d'iOS à la saisie. */
+  input, textarea, select { font-size: 16px; }
+  .btn { min-height: 40px; }
+}

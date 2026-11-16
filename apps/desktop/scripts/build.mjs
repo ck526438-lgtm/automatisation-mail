@@ -52,7 +52,8 @@ const pgliteVersion = JSON.parse(readFileSync(path.join(pgliteDir, "package.json
 // Seule dépendance à l'exécution (tout le reste est compilé dans main.cjs). Déclarée pour qu'electron-builder l'embarque.
 writeFileSync(path.join(appDir, "package.json"), JSON.stringify({
   name: "automatisation-mail", productName: pkg.productName, version: pkg.version, description: pkg.description,
-  author: "Automatisation Mail", main: "main.cjs", license: "UNLICENSED",
+  author: { name: "Automatisation Mail", email: "ck526438-lgtm@users.noreply.github.com" },
+  homepage: "https://github.com/ck526438-lgtm/automatisation-mail", main: "main.cjs", license: "UNLICENSED",
   dependencies: { "@electric-sql/pglite": pgliteVersion },
 }, null, 2));
 
@@ -63,7 +64,7 @@ step("Interface (serveur Next.js autonome)");
 const web = path.join(root, "apps/web");
 const standalone = path.join(web, ".next/standalone");
 if (!existsSync(standalone)) throw new Error("apps/web/.next/standalone absent : lancez sans --skip-web");
-// dereference : Windows et l'installateur gèrent mal les liens symboliques de pnpm.
+// dereference : Windows et les installateurs gèrent mal les liens symboliques de pnpm.
 cpSync(standalone, path.join(res, "web"), { recursive: true, dereference: true });
 cpSync(path.join(web, ".next/static"), path.join(res, "web/apps/web/.next/static"), { recursive: true });
 cpSync(path.join(web, "public"), path.join(res, "web/apps/web/public"), { recursive: true });

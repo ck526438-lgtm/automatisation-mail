@@ -1,6 +1,6 @@
 /**
  * Worker en mode serveur : BullMQ sur Redis, plusieurs instances possibles.
- * (L'application Windows utilise le moteur local, voir local.ts.)
+ * (L'application de bureau utilise le moteur local, voir local.ts.)
  */
 import { DelayedError, Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";

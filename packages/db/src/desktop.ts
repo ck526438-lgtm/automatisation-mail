@@ -1,5 +1,5 @@
 /**
- * Démarrage de l'application Windows : un poste = une organisation et un propriétaire,
+ * Démarrage de l'application de bureau : un poste = une organisation et un propriétaire,
  * connecté automatiquement (pas d'écran de connexion sur son propre PC).
  */
 import { generateApiKey, hashApiKey } from "./index.js";

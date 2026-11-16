@@ -1,17 +1,21 @@
 /**
- * Application Windows d'Automatisation Mail (Electron).
+ * Application de bureau d'Automatisation Mail (Electron) : Windows, macOS et Linux.
  * - démarre la base, l'API, le moteur d'envoi et l'interface sur le poste ;
  * - ouvre la session automatiquement ;
- * - reste dans la zone de notification quand on ferme la fenêtre, pour que les séquences continuent ;
- * - peut démarrer avec Windows.
+ * - reste dans la zone de notification (barre des menus sur macOS) quand on ferme la fenêtre,
+ *   pour que les séquences continuent ;
+ * - peut démarrer à l'ouverture de session.
  */
 import { app, BrowserWindow, dialog, Menu, nativeImage, Notification, safeStorage, session, shell, Tray } from "electron";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { AUTOSTART_LABEL, linuxAutostartEnabled, platform, setLinuxAutostart, SYSTEM_NAME, TRAY_HINT } from "./platform.js";
 import { startRuntime, type Runtime } from "./runtime.js";
 
 const APP_NAME = "Automatisation Mail";
+const RELEASES_URL = "https://github.com/ck526438-lgtm/automatisation-mail/releases/latest";
+const HELP_URL = "https://github.com/ck526438-lgtm/automatisation-mail/blob/main/docs/applications.md";
 app.setName(APP_NAME);
 app.setAppUserModelId("ci.automatisation-mail.app");
 
@@ -29,7 +33,7 @@ function log(msg: string, extra?: unknown) {
   if (!app.isPackaged) process.stdout.write(line);
 }
 
-/** Secrets propres au poste, chiffrés par Windows (DPAPI) quand c'est possible. */
+/** Secrets propres au poste, chiffrés par le système quand c'est possible (DPAPI, Trousseau macOS, libsecret/KWallet). */
 function loadSecrets(): { encryptionKey: string; trackingSecret: string } {
   const file = path.join(dataDir, "secrets.bin");
   if (existsSync(file)) {
@@ -93,7 +97,7 @@ function createWindow() {
       hintShown = true;
       new Notification({
         title: APP_NAME,
-        body: "L'application continue d'envoyer vos séquences en arrière-plan. Clic droit sur l'icône près de l'horloge pour quitter.",
+        body: `L'application continue d'envoyer vos séquences en arrière-plan. ${TRAY_HINT[platform]}`,
         icon: path.join(assetsDir, "icon.png"),
       }).show();
     }
@@ -111,33 +115,130 @@ function showWindow() {
   }
 }
 
+/** Démarrage à l'ouverture de session. Electron ne le gère pas sous Linux : on écrit une entrée XDG Autostart. */
+function autostartEnabled(): boolean {
+  return platform === "linux" ? linuxAutostartEnabled() : app.getLoginItemSettings().openAtLogin;
+}
+
+function setAutostart(enabled: boolean) {
+  try {
+    if (platform === "linux") {
+      // Une AppImage est montée à un chemin temporaire : c'est le fichier .AppImage qu'il faut relancer.
+      setLinuxAutostart(enabled, process.env.APPIMAGE ?? process.execPath, APP_NAME);
+    } else {
+      app.setLoginItemSettings({ openAtLogin: enabled, args: ["--hidden"] });
+    }
+  } catch (err) {
+    log("Démarrage automatique non modifié", String(err));
+  }
+}
+
+/** Lancé par le système à l'ouverture de session : pas de fenêtre, seulement l'icône. */
+function startedHidden(): boolean {
+  return process.argv.includes("--hidden") || (platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
+}
+
+function quit() {
+  quitting = true;
+  app.quit();
+}
+
 function buildTray() {
-  tray = new Tray(nativeImage.createFromPath(path.join(assetsDir, "tray.png")));
+  let icon = nativeImage.createFromPath(path.join(assetsDir, "tray.png"));
+  // La barre des menus de macOS attend une icône d'environ 18 points.
+  if (platform === "darwin") icon = icon.resize({ width: 18, height: 18, quality: "best" });
+  tray = new Tray(icon);
   tray.setToolTip(`${APP_NAME} — envois actifs`);
   const refresh = () => {
-    const startup = app.getLoginItemSettings().openAtLogin;
+    const startup = autostartEnabled();
     tray!.setContextMenu(Menu.buildFromTemplate([
       { label: `Ouvrir ${APP_NAME}`, click: showWindow },
       { type: "separator" },
       {
-        label: "Démarrer avec Windows", type: "checkbox", checked: startup,
+        label: AUTOSTART_LABEL[platform], type: "checkbox", checked: startup,
         click: () => {
-          app.setLoginItemSettings({ openAtLogin: !startup, args: ["--hidden"] });
+          setAutostart(!startup);
           refresh();
         },
       },
       { label: "Ouvrir le dossier des données", click: () => void shell.openPath(dataDir) },
+      { label: "Ouvrir le journal", click: () => void shell.openPath(logFile) },
       { type: "separator" },
-      { label: "Quitter (arrête les envois)", click: () => { quitting = true; app.quit(); } },
+      { label: "Aide", click: () => void shell.openExternal(HELP_URL) },
+      { label: `Rechercher une mise à jour (version ${app.getVersion()})`, click: () => void shell.openExternal(RELEASES_URL) },
+      { type: "separator" },
+      { label: "Quitter (arrête les envois)", click: quit },
     ]));
   };
   refresh();
-  tray.on("click", showWindow);
+  // Windows : clic gauche = ouvrir. macOS et Linux affichent le menu au clic.
+  if (platform === "win32") tray.on("click", showWindow);
+}
+
+/**
+ * macOS : menu d'application en français (sans lui, ⌘C / ⌘V / ⌘Q ne fonctionnent pas dans la fenêtre).
+ * Windows et Linux gardent le menu par défaut, masqué, pour ses raccourcis clavier.
+ */
+function buildAppMenu() {
+  if (platform !== "darwin") return;
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: APP_NAME,
+      submenu: [
+        { role: "about", label: `À propos d'${APP_NAME}` },
+        { type: "separator" },
+        { role: "hide", label: `Masquer ${APP_NAME}` },
+        { role: "hideOthers", label: "Masquer les autres" },
+        { role: "unhide", label: "Tout afficher" },
+        { type: "separator" },
+        { label: "Quitter (arrête les envois)", accelerator: "Command+Q", click: quit },
+      ],
+    },
+    {
+      label: "Édition",
+      submenu: [
+        { role: "undo", label: "Annuler" },
+        { role: "redo", label: "Rétablir" },
+        { type: "separator" },
+        { role: "cut", label: "Couper" },
+        { role: "copy", label: "Copier" },
+        { role: "paste", label: "Coller" },
+        { role: "selectAll", label: "Tout sélectionner" },
+      ],
+    },
+    {
+      label: "Présentation",
+      submenu: [
+        { role: "reload", label: "Actualiser" },
+        { type: "separator" },
+        { role: "resetZoom", label: "Taille réelle" },
+        { role: "zoomIn", label: "Agrandir" },
+        { role: "zoomOut", label: "Réduire" },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "Plein écran" },
+      ],
+    },
+    {
+      label: "Fenêtre",
+      submenu: [
+        { role: "minimize", label: "Réduire" },
+        { role: "close", label: "Fermer la fenêtre" },
+      ],
+    },
+    {
+      label: "Aide",
+      submenu: [
+        { label: "Guide de l'application", click: () => void shell.openExternal(HELP_URL) },
+        { label: "Rechercher une mise à jour", click: () => void shell.openExternal(RELEASES_URL) },
+        { label: "Ouvrir le journal", click: () => void shell.openPath(logFile) },
+      ],
+    },
+  ]));
 }
 
 async function boot() {
   mkdirSync(dataDir, { recursive: true });
-  log(`Démarrage ${APP_NAME} ${app.getVersion()}`);
+  log(`Démarrage ${APP_NAME} ${app.getVersion()} (${SYSTEM_NAME[platform]} ${process.arch})`);
   try {
     runtime = await startRuntime({
       dataDir,
@@ -161,8 +262,14 @@ async function boot() {
     expirationDate: Math.floor(runtime.sessionExpiresAt.getTime() / 1000),
   });
 
-  buildTray();
-  if (!process.argv.includes("--hidden")) createWindow();
+  buildAppMenu();
+  try {
+    buildTray();
+  } catch (err) {
+    // Certains bureaux Linux n'ont pas de zone de notification : relancer l'application rouvre la fenêtre.
+    log("Zone de notification indisponible", String(err));
+  }
+  if (!startedHidden() || !tray) createWindow();
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -172,6 +279,8 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(boot);
   // Fenêtre fermée : on reste dans la zone de notification.
   app.on("window-all-closed", () => undefined);
+  // macOS : clic sur l'icône du Dock.
+  app.on("activate", () => { if (runtime) showWindow(); });
   app.on("before-quit", (e) => {
     quitting = true;
     if (!runtime) return;

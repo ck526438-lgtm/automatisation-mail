@@ -39,7 +39,7 @@ export function registerOAuthStartRoute(app: FastifyInstance) {
 }
 
 export function registerOAuthCallbackRoute(app: FastifyInstance, { db }: AppDeps) {
-  // Application Windows : le consentement Google/Microsoft s'ouvre dans le navigateur du système
+  // Application de bureau : le consentement Google/Microsoft s'ouvre dans le navigateur du système
   // (ils refusent les fenêtres intégrées), on y affiche donc une page de fin plutôt que l'interface.
   const back = (reply: FastifyReply, params: Record<string, string>) =>
     config.mode === "desktop"
