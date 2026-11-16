@@ -33,14 +33,17 @@ jobs:
           - name: Windows
             os: windows-latest
             flag: --win
+            archs: x64
             artifact: Automatisation-Mail-Windows
           - name: macOS
             os: macos-latest
             flag: --mac
+            archs: arm64 x64
             artifact: Automatisation-Mail-macOS
           - name: Linux
             os: ubuntu-latest
             flag: --linux
+            archs: x64
             artifact: Automatisation-Mail-Linux
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +64,12 @@ jobs:
 
       - name: Construire les installateurs
         working-directory: apps/desktop
-        run: npx electron-builder --config electron-builder.json ${{ matrix.flag }} --publish never
+        shell: bash
+        # Une architecture à la fois : sur macOS, deux créations de .dmg en parallèle font échouer hdiutil.
+        run: |
+          for arch in ${{ matrix.archs }}; do
+            npx electron-builder --config electron-builder.json ${{ matrix.flag }} --$arch --publish never
+          done
         env:
           # Pas de certificat de signature : voir docs/applications.md.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
