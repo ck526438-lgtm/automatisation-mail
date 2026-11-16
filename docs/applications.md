@@ -146,15 +146,11 @@ L'application de bureau autonome, elle, n'est pas joignable depuis un téléphon
 ## Construire les installateurs
 
 Ils sont construits par GitHub Actions (workflow **Applications de bureau**) à chaque push sur `main` et pour chaque pull request,
-après un test de bout en bout sur les trois systèmes. Pour publier une version :
+après un test de bout en bout sur les trois systèmes.
 
-```bash
-# 1. Mettre à jour "version" dans apps/desktop/package.json et CHANGELOG.md, fusionner dans main
-# 2. Poser le tag
-git tag v0.5.0 && git push origin v0.5.0
-```
-
-Le workflow crée alors la version GitHub avec les cinq installateurs et `SHA256SUMS.txt`.
+Pour publier une version : changez `"version"` dans `apps/desktop/package.json`, complétez `CHANGELOG.md` et fusionnez dans `main`.
+Le workflow crée alors le tag `vX.Y.Z` et la version GitHub avec les cinq installateurs et `SHA256SUMS.txt`. Tant que le numéro
+ne change pas, rien n'est republié.
 
 En local, chaque système construit son propre installateur :
 

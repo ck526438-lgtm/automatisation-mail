@@ -1,8 +1,8 @@
 name: Applications de bureau
 
 # Construit les installateurs Windows, macOS et Linux.
-# - push sur main / pull request : installateurs disponibles dans les artefacts de l'exécution ;
-# - tag v* : publiés dans une version GitHub (Releases).
+# - pull request : installateurs disponibles dans les artefacts de l'exécution ;
+# - push sur main : publiés dans une version GitHub (Releases) si le numéro de version est nouveau.
 on:
   push:
     branches: [main]
@@ -84,22 +84,49 @@ jobs:
             apps/desktop/dist/*.deb
           if-no-files-found: error
 
+  # Publie une version GitHub (tag + installateurs) :
+  # - à chaque push sur main dont la version (apps/desktop/package.json) n'a pas encore été publiée ;
+  # - ou quand un tag v* est poussé à la main.
   release:
     name: Publier la version
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+      - name: Version à publier
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            tag="v$(node -p "require('./apps/desktop/package.json').version")"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "La version $tag est déjà publiée : rien à faire."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
+        if: steps.version.outputs.publish == 'true'
         with:
           path: dist
           merge-multiple: true
       - name: Sommes de contrôle
+        if: steps.version.outputs.publish == 'true'
         working-directory: dist
         run: sha256sum * > SHA256SUMS.txt
       - uses: softprops/action-gh-release@v2
+        if: steps.version.outputs.publish == 'true'
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Automatisation Mail ${{ steps.version.outputs.tag }}
           files: dist/*
           generate_release_notes: true
